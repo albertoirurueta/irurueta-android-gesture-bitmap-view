@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="GestureBitmapView">
+        <attr name="src" format="reference"/>
+        <attr name="displayType" format="enum">
+            <enum name="none" value="0"/>
+            <enum name="fit_if_bigger" value="1"/>
+            <enum name="fit_x_top" value="2"/>
+            <enum name="fit_x_bottom" value="3"/>
+            <enum name="fit_x_center" value="4"/>
+            <enum name="fit_y_left" value="5"/>
+            <enum name="fit_y_right" value="6"/>
+            <enum name="fit_y_center" value="7"/>
+            <enum name="center_crop" value="8"/>
+        </attr>
+        <attr name="animationDurationMillis" format="integer"/>
+        <attr name="rotationEnabled" format="boolean"/>
+        <attr name="scaleEnabled" format="boolean"/>
+        <attr name="scrollEnabled" format="boolean"/>
+        <attr name="twoFingerScrollEnabled" format="boolean"/>
+        <attr name="doubleTapEnabled" format="boolean"/>
+        <attr name="minScale" format="float"/>
+        <attr name="maxScale" format="float"/>
+        <attr name="scaleFactorJump" format="float"/>
+        <attr name="scaleMargin" format="float"/>
+    </declare-styleable>
+</resources>
