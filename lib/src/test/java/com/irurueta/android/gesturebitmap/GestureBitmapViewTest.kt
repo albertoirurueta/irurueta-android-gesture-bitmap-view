@@ -30,6 +30,15 @@ import kotlin.random.Random
 class GestureBitmapViewTest {
 
     @Test
+    fun constants_haveExpectedDefaultValues() {
+        assertEquals(200L, GestureBitmapView.DEFAULT_ANIMATION_DURATION_MILLIS)
+        assertEquals(1.0f, GestureBitmapView.DEFAULT_MIN_SCALE, 0.0f)
+        assertEquals(10.0f, GestureBitmapView.DEFAULT_MAX_SCALE, 0.0f)
+        assertEquals(3.0f, GestureBitmapView.DEFAULT_SCALE_FACTOR_JUMP, 0.0f)
+        assertEquals(0.1f, GestureBitmapView.DEFAULT_SCALE_MARGIN, 0.0f)
+    }
+
+    @Test
     fun constructor_initializesDefaultValues() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val view = GestureBitmapView(context)
@@ -52,6 +61,7 @@ class GestureBitmapViewTest {
         assertTrue(view.scaleEnabled)
         assertTrue(view.scrollEnabled)
         assertTrue(view.twoFingerScrollEnabled)
+        assertFalse(view.exclusiveTwoFingerScrollEnabled)
         assertTrue(view.doubleTapEnabled)
         assertNull(view.bitmap)
         assertEquals(GestureBitmapView.DisplayType.FIT_X_CENTER, view.displayType)
@@ -142,6 +152,12 @@ class GestureBitmapViewTest {
         }.returns(false)
         every {
             typedArray.getBoolean(
+                R.styleable.GestureBitmapView_exclusiveTwoFingerScrollEnabled,
+                any()
+            )
+        }.returns(true)
+        every {
+            typedArray.getBoolean(
                 R.styleable.GestureBitmapView_doubleTapEnabled,
                 any()
             )
@@ -186,6 +202,7 @@ class GestureBitmapViewTest {
         assertFalse(view.rotationEnabled)
         assertFalse(view.scrollEnabled)
         assertFalse(view.twoFingerScrollEnabled)
+        assertTrue(view.exclusiveTwoFingerScrollEnabled)
         assertEquals(0.5f, view.minScale, 0.0f)
         assertEquals(5.0f, view.maxScale, 0.0f)
         assertEquals(2.0f, view.scaleFactorJump, 0.0f)
@@ -432,6 +449,21 @@ class GestureBitmapViewTest {
 
         // check
         assertFalse(view.twoFingerScrollEnabled)
+    }
+
+    @Test
+    fun exclusiveTwoFingerScrollEnabled_returnsExpectedValue() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val view = GestureBitmapView(context)
+
+        // check default value
+        assertFalse(view.exclusiveTwoFingerScrollEnabled)
+
+        // set new value
+        view.exclusiveTwoFingerScrollEnabled = true
+
+        // check
+        assertTrue(view.exclusiveTwoFingerScrollEnabled)
     }
 
     @Test
@@ -2461,11 +2493,14 @@ class GestureBitmapViewTest {
         assertEquals(view.scaleEnabled, bundle.getBoolean(SCALE_ENABLED_KEY))
         assertEquals(view.scrollEnabled, bundle.getBoolean(SCROLL_ENABLED_KEY))
         assertEquals(view.twoFingerScrollEnabled, bundle.getBoolean(TWO_FINGER_SCROLL_ENABLED_KEY))
+        assertEquals(view.exclusiveTwoFingerScrollEnabled, bundle.getBoolean(
+            EXCLUSIVE_TWO_FINGER_SCROLL_ENABLED_KEY))
         assertEquals(view.doubleTapEnabled, bundle.getBoolean(DOUBLE_TAP_ENABLED_KEY))
         assertEquals(view.displayType, bundle.getSerializable(DISPLAY_TYPE_KEY))
         assertEquals(view.minScale, bundle.getFloat(MIN_SCALE_KEY), 0.0f)
         assertEquals(view.maxScale, bundle.getFloat(MAX_SCALE_KEY), 0.0f)
         assertEquals(view.scaleFactorJump, bundle.getFloat(SCALE_FACTOR_JUMP_KEY), 0.0f)
+        assertEquals(view.scaleMargin, bundle.getFloat(SCALE_MARGIN_KEY), 0.0f)
     }
 
     @Test
@@ -2483,11 +2518,13 @@ class GestureBitmapViewTest {
         assertTrue(view.scaleEnabled)
         assertTrue(view.scrollEnabled)
         assertTrue(view.twoFingerScrollEnabled)
+        assertFalse(view.exclusiveTwoFingerScrollEnabled)
         assertTrue(view.doubleTapEnabled)
         assertEquals(GestureBitmapView.DisplayType.FIT_X_CENTER, view.displayType)
         assertEquals(1.0f, view.minScale, 0.0f)
         assertEquals(10.0f, view.maxScale, 0.0f)
         assertEquals(3.0f, view.scaleFactorJump, 0.0f)
+        assertEquals(0.1f, view.scaleMargin, 0.0f)
 
         // prepare bundle to restore from
         val bundle = Bundle()
@@ -2519,6 +2556,7 @@ class GestureBitmapViewTest {
         bundle.putBoolean(SCALE_ENABLED_KEY, false)
         bundle.putBoolean(SCROLL_ENABLED_KEY, false)
         bundle.putBoolean(TWO_FINGER_SCROLL_ENABLED_KEY, false)
+        bundle.putBoolean(EXCLUSIVE_TWO_FINGER_SCROLL_ENABLED_KEY, true)
         bundle.putBoolean(DOUBLE_TAP_ENABLED_KEY, false)
 
         bundle.putSerializable(DISPLAY_TYPE_KEY, GestureBitmapView.DisplayType.NONE)
@@ -2526,6 +2564,7 @@ class GestureBitmapViewTest {
         bundle.putFloat(MIN_SCALE_KEY, 0.5f)
         bundle.putFloat(MAX_SCALE_KEY, 3.0f)
         bundle.putFloat(SCALE_FACTOR_JUMP_KEY, 5.0f)
+        bundle.putFloat(SCALE_MARGIN_KEY, 0.2f)
 
         // restore state
         view.callPrivateFunc("onRestoreInstanceState", bundle)
@@ -2539,11 +2578,13 @@ class GestureBitmapViewTest {
         assertFalse(view.scaleEnabled)
         assertFalse(view.scrollEnabled)
         assertFalse(view.twoFingerScrollEnabled)
+        assertTrue(view.exclusiveTwoFingerScrollEnabled)
         assertFalse(view.doubleTapEnabled)
         assertEquals(GestureBitmapView.DisplayType.NONE, view.displayType)
         assertEquals(0.5f, view.minScale, 0.0f)
         assertEquals(3.0f, view.maxScale, 0.0f)
         assertEquals(5.0f, view.scaleFactorJump, 0.0f)
+        assertEquals(0.2f, view.scaleMargin, 0.0f)
     }
 
     @Test
@@ -3086,7 +3127,7 @@ class GestureBitmapViewTest {
     }
 
     @Test
-    fun gestureFling_whenTwoFingerScrollEnabledAnd1PointerCount_makesNoAction() {
+    fun gestureFling_whenExclusiveAndTwoFingerScrollEnabledAnd1PointerCount_makesNoAction() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val view = GestureBitmapView(context)
 
@@ -3098,6 +3139,7 @@ class GestureBitmapViewTest {
 
         view.scrollEnabled = true
         view.twoFingerScrollEnabled = true
+        view.exclusiveTwoFingerScrollEnabled = true
 
         val transformationParameters = view.transformationParameters
         assertEquals(0.0, transformationParameters.horizontalTranslation, 0.0)
@@ -3129,7 +3171,7 @@ class GestureBitmapViewTest {
     }
 
     @Test
-    fun gestureFling_whenTwoFingerScrollDisabledAnd2PointerCount_makesNoAction() {
+    fun gestureFling_whenExclusiveAndTwoFingerScrollDisabledAnd2PointerCount_makesNoAction() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val view = GestureBitmapView(context)
 
@@ -3141,6 +3183,7 @@ class GestureBitmapViewTest {
 
         view.scrollEnabled = true
         view.twoFingerScrollEnabled = false
+        view.exclusiveTwoFingerScrollEnabled = true
 
         val transformationParameters = view.transformationParameters
         assertEquals(0.0, transformationParameters.horizontalTranslation, 0.0)
@@ -3166,6 +3209,43 @@ class GestureBitmapViewTest {
 
         // execute fling
         assertFalse(gestureDetectorListener.onFling(event2, event1, 1.0f, 1.0f))
+
+        // check that transformation has not changed
+        assertEquals(transformationParameters, view.transformationParameters)
+    }
+
+    @Test
+    fun gestureFling_whenNonExclusiveAndScaleGestureDetectorIsInProgress_makesNoAction() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val view = GestureBitmapView(context)
+
+        val gestureDetector: GestureDetector? = view.getPrivateProperty("gestureDetector")
+        val gestureDetectorListener: GestureDetector.SimpleOnGestureListener? =
+            gestureDetector?.getPrivateProperty("mListener")
+
+        require(gestureDetectorListener != null)
+
+        view.scrollEnabled = true
+        view.twoFingerScrollEnabled = false
+        view.exclusiveTwoFingerScrollEnabled = false
+
+        val scaleGestureDetector: ScaleGestureDetector? =
+            view.getPrivateProperty("scaleGestureDetector")
+        assertNotNull(scaleGestureDetector)
+
+        val scaleGestureDetectorSpy = spyk(scaleGestureDetector as ScaleGestureDetector)
+        view.setPrivateProperty("scaleGestureDetector", scaleGestureDetectorSpy)
+        every { scaleGestureDetectorSpy.isInProgress }.returns(true)
+
+        val event2 = mockk<MotionEvent>()
+        every { event2.pointerCount }.returns(2)
+
+        val transformationParameters = view.transformationParameters
+        assertEquals(0.0, transformationParameters.horizontalTranslation, 0.0)
+        assertEquals(0.0, transformationParameters.verticalTranslation, 0.0)
+
+        // execute fling
+        assertFalse(gestureDetectorListener.onFling(event2, event2, 1.0f, 1.0f))
 
         // check that transformation has not changed
         assertEquals(transformationParameters, view.transformationParameters)
@@ -3969,7 +4049,7 @@ class GestureBitmapViewTest {
     }
 
     @Test
-    fun gestureScroll_whenTwoFingerScrollEnabledAnd1PointerCount_makesNoAction() {
+    fun gestureScroll_whenExclusiveAndTwoFingerScrollEnabledAnd1PointerCount_makesNoAction() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val view = GestureBitmapView(context)
 
@@ -3981,6 +4061,7 @@ class GestureBitmapViewTest {
 
         view.scrollEnabled = true
         view.twoFingerScrollEnabled = true
+        view.exclusiveTwoFingerScrollEnabled = true
 
         val transformationParameters = view.transformationParameters
         assertEquals(0.0, transformationParameters.horizontalTranslation, 0.0)
@@ -4012,7 +4093,7 @@ class GestureBitmapViewTest {
     }
 
     @Test
-    fun gestureScroll_whenTwoFingerScrollDisabledAnd2PointerCount_makesNoAction() {
+    fun gestureScroll_whenExclusiveAndTwoFingerScrollDisabledAnd2PointerCount_makesNoAction() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val view = GestureBitmapView(context)
 
@@ -4024,6 +4105,7 @@ class GestureBitmapViewTest {
 
         view.scrollEnabled = true
         view.twoFingerScrollEnabled = false
+        view.exclusiveTwoFingerScrollEnabled = true
 
         val transformationParameters = view.transformationParameters
         assertEquals(0.0, transformationParameters.horizontalTranslation, 0.0)
@@ -4049,6 +4131,43 @@ class GestureBitmapViewTest {
 
         // execute scroll
         assertFalse(gestureDetectorListener.onScroll(event2, event1, 1.0f, 1.0f))
+
+        // check that transformation has not changed
+        assertEquals(transformationParameters, view.transformationParameters)
+    }
+
+    @Test
+    fun gestureScroll_whenNonExclusiveAndScaleGestureDetectorIsInProgress_makesNoAction() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val view = GestureBitmapView(context)
+
+        val gestureDetector: GestureDetector? = view.getPrivateProperty("gestureDetector")
+        val gestureDetectorListener: GestureDetector.SimpleOnGestureListener? =
+            gestureDetector?.getPrivateProperty("mListener")
+
+        require(gestureDetectorListener != null)
+
+        view.scrollEnabled = true
+        view.twoFingerScrollEnabled = false
+        view.exclusiveTwoFingerScrollEnabled = false
+
+        val scaleGestureDetector: ScaleGestureDetector? =
+            view.getPrivateProperty("scaleGestureDetector")
+        assertNotNull(scaleGestureDetector)
+
+        val scaleGestureDetectorSpy = spyk(scaleGestureDetector as ScaleGestureDetector)
+        view.setPrivateProperty("scaleGestureDetector", scaleGestureDetectorSpy)
+        every { scaleGestureDetectorSpy.isInProgress }.returns(true)
+
+        val event1 = mockk<MotionEvent>()
+        every { event1.pointerCount }.returns(1)
+
+        val transformationParameters = view.transformationParameters
+        assertEquals(0.0, transformationParameters.horizontalTranslation, 0.0)
+        assertEquals(0.0, transformationParameters.verticalTranslation, 0.0)
+
+        // execute scroll
+        assertFalse(gestureDetectorListener.onScroll(event1, event1, 1.0f, 1.0f))
 
         // check that transformation has not changed
         assertEquals(transformationParameters, view.transformationParameters)
@@ -4385,11 +4504,14 @@ class GestureBitmapViewTest {
         private const val SCALE_ENABLED_KEY = "scaleEnabled"
         private const val SCROLL_ENABLED_KEY = "scrollEnabled"
         private const val TWO_FINGER_SCROLL_ENABLED_KEY = "twoFingerScrollEnabled"
+        private const val EXCLUSIVE_TWO_FINGER_SCROLL_ENABLED_KEY =
+            "exclusiveTwoFingerScrollEnabled"
         private const val DOUBLE_TAP_ENABLED_KEY = "doubleTapEnabled"
         private const val DISPLAY_TYPE_KEY = "displayType"
         private const val MIN_SCALE_KEY = "minScale"
         private const val MAX_SCALE_KEY = "maxScale"
         private const val SCALE_FACTOR_JUMP_KEY = "scaleFactorJump"
+        private const val SCALE_MARGIN_KEY = "scaleMargin"
 
         private fun getTransformationParameters(): MetricTransformationParameters {
             val randomizer = UniformRandomizer()

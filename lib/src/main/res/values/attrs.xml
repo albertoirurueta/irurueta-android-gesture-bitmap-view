@@ -18,6 +18,7 @@
         <attr name="scaleEnabled" format="boolean"/>
         <attr name="scrollEnabled" format="boolean"/>
         <attr name="twoFingerScrollEnabled" format="boolean"/>
+        <attr name="exclusiveTwoFingerScrollEnabled" format="boolean"/>
         <attr name="doubleTapEnabled" format="boolean"/>
         <attr name="minScale" format="float"/>
         <attr name="maxScale" format="float"/>

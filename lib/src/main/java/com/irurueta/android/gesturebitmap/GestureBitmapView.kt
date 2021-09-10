@@ -220,6 +220,16 @@ class GestureBitmapView @JvmOverloads constructor(
     var twoFingerScrollEnabled = true
 
     /**
+     * Indicates whether scroll using two fingers is exclusive.
+     * When this property is true, and both [scrollEnabled] and
+     * [twoFingerScrollEnabled] are also true, then scroll is disabled with one
+     * finger and can only be done with two fingers.
+     * If false and both [scrollEnabled] and [twoFingerScrollEnabled], then scroll
+     * can be made with both one or two fingers.
+     */
+    var exclusiveTwoFingerScrollEnabled = false
+
+    /**
      * Indicates whether double tap is enabled or not to make a fast jump in scale.
      */
     var doubleTapEnabled = true
@@ -524,6 +534,7 @@ class GestureBitmapView @JvmOverloads constructor(
         bundle.putBoolean(SCALE_ENABLED_KEY, scaleEnabled)
         bundle.putBoolean(SCROLL_ENABLED_KEY, scrollEnabled)
         bundle.putBoolean(TWO_FINGER_SCROLL_ENABLED_KEY, twoFingerScrollEnabled)
+        bundle.putBoolean(EXCLUSIVE_TWO_FINGER_SCROLL_ENABLED_KEY, exclusiveTwoFingerScrollEnabled)
         bundle.putBoolean(DOUBLE_TAP_ENABLED_KEY, doubleTapEnabled)
 
         bundle.putSerializable(DISPLAY_TYPE_KEY, displayType)
@@ -531,6 +542,7 @@ class GestureBitmapView @JvmOverloads constructor(
         bundle.putFloat(MIN_SCALE_KEY, minScale)
         bundle.putFloat(MAX_SCALE_KEY, maxScale)
         bundle.putFloat(SCALE_FACTOR_JUMP_KEY, scaleFactorJump)
+        bundle.putFloat(SCALE_MARGIN_KEY, scaleMargin)
 
         return bundle
     }
@@ -563,11 +575,14 @@ class GestureBitmapView @JvmOverloads constructor(
             scaleEnabled = state.getBoolean(SCALE_ENABLED_KEY)
             scrollEnabled = state.getBoolean(SCROLL_ENABLED_KEY)
             twoFingerScrollEnabled = state.getBoolean(TWO_FINGER_SCROLL_ENABLED_KEY)
+            exclusiveTwoFingerScrollEnabled = state.getBoolean(
+                EXCLUSIVE_TWO_FINGER_SCROLL_ENABLED_KEY)
             doubleTapEnabled = state.getBoolean(DOUBLE_TAP_ENABLED_KEY)
 
             minScale = state.getFloat(MIN_SCALE_KEY)
             maxScale = state.getFloat(MAX_SCALE_KEY)
             scaleFactorJump = state.getFloat(SCALE_FACTOR_JUMP_KEY)
+            scaleMargin = state.getFloat(SCALE_MARGIN_KEY)
         }
 
         // request redraw
@@ -1514,6 +1529,11 @@ class GestureBitmapView @JvmOverloads constructor(
             twoFingerScrollEnabled
         )
 
+        exclusiveTwoFingerScrollEnabled = a.getBoolean(
+            R.styleable.GestureBitmapView_exclusiveTwoFingerScrollEnabled,
+            exclusiveTwoFingerScrollEnabled
+        )
+
         doubleTapEnabled =
             a.getBoolean(R.styleable.GestureBitmapView_doubleTapEnabled, doubleTapEnabled)
 
@@ -1610,10 +1630,12 @@ class GestureBitmapView @JvmOverloads constructor(
                     if (!scrollEnabled) return false
 
                     if (e1 == null || e2 == null) return false
-                    if (twoFingerScrollEnabled) {
-                        if (e1.pointerCount < 2 || e2.pointerCount < 2) return false
-                    } else {
-                        if (e1.pointerCount > 1 || e2.pointerCount > 1) return false
+                    if (exclusiveTwoFingerScrollEnabled) {
+                        if (twoFingerScrollEnabled) {
+                            if (e1.pointerCount < 2 || e2.pointerCount < 2) return false
+                        } else {
+                            if (e1.pointerCount > 1 || e2.pointerCount > 1) return false
+                        }
                     }
 
                     val scaleInProgress = (scaleGestureDetector?.isInProgress) ?: false
@@ -1643,10 +1665,12 @@ class GestureBitmapView @JvmOverloads constructor(
                     // has been used to make scroll
                     if (!scrollEnabled) return false
                     if (e1 == null || e2 == null) return false
-                    if (twoFingerScrollEnabled) {
-                        if (e1.pointerCount < 2 && e2.pointerCount < 2) return false
-                    } else {
-                        if (e1.pointerCount > 1 || e2.pointerCount > 1) return false
+                    if (exclusiveTwoFingerScrollEnabled) {
+                        if (twoFingerScrollEnabled) {
+                            if (e1.pointerCount < 2 || e2.pointerCount < 2) return false
+                        } else {
+                            if (e1.pointerCount > 1 || e2.pointerCount > 1) return false
+                        }
                     }
 
                     val scaleInProgress = (scaleGestureDetector?.isInProgress) ?: false
@@ -1751,6 +1775,12 @@ class GestureBitmapView @JvmOverloads constructor(
         private const val TWO_FINGER_SCROLL_ENABLED_KEY = "twoFingerScrollEnabled"
 
         /**
+         * Key to store flag indicating whether two finger scroll is exclusively enabled.
+         */
+        private const val EXCLUSIVE_TWO_FINGER_SCROLL_ENABLED_KEY =
+            "exclusiveTwoFingerScrollEnabled"
+
+        /**
          * Key to store flag indicating whether tap gesture is enabled.
          */
         private const val DOUBLE_TAP_ENABLED_KEY = "doubleTapEnabled"
@@ -1774,6 +1804,11 @@ class GestureBitmapView @JvmOverloads constructor(
          * Key to store scale factor jump.
          */
         private const val SCALE_FACTOR_JUMP_KEY = "scaleFactorJump"
+
+        /**
+         * Key to store scale margin.
+         */
+        private const val SCALE_MARGIN_KEY = "scaleMargin"
 
         /**
          * Length of arrays to store matrix values.
@@ -1839,7 +1874,7 @@ class GestureBitmapView @JvmOverloads constructor(
 
         /**
          * Initially scales image to fill the whole view and centers image on the view
-         * while presrving aspect ratio.
+         * while preserving aspect ratio.
          */
         CENTER_CROP
     }
