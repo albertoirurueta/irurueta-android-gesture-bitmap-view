@@ -35,7 +35,9 @@ class GestureBitmapViewTest {
         assertEquals(1.0f, GestureBitmapView.DEFAULT_MIN_SCALE, 0.0f)
         assertEquals(10.0f, GestureBitmapView.DEFAULT_MAX_SCALE, 0.0f)
         assertEquals(3.0f, GestureBitmapView.DEFAULT_SCALE_FACTOR_JUMP, 0.0f)
-        assertEquals(0.1f, GestureBitmapView.DEFAULT_SCALE_MARGIN, 0.0f)
+        assertEquals(0.1f, GestureBitmapView.DEFAULT_MIN_SCALE_MARGIN, 0.0f)
+        assertEquals(1.0f, GestureBitmapView.DEFAULT_MAX_SCALE_MARGIN, 0.0f)
+        assertEquals(100.0f, GestureBitmapView.DEFAULT_SCROLL_MARGIN, 0.0f)
     }
 
     @Test
@@ -68,6 +70,12 @@ class GestureBitmapViewTest {
         assertEquals(GestureBitmapView.DEFAULT_MIN_SCALE, view.minScale, 0.0f)
         assertEquals(GestureBitmapView.DEFAULT_MAX_SCALE, view.maxScale, 0.0f)
         assertEquals(GestureBitmapView.DEFAULT_SCALE_FACTOR_JUMP, view.scaleFactorJump, 0.0f)
+        assertEquals(GestureBitmapView.DEFAULT_MIN_SCALE_MARGIN, view.minScaleMargin, 0.0f)
+        assertEquals(GestureBitmapView.DEFAULT_MAX_SCALE_MARGIN, view.maxScaleMargin, 0.0f)
+        assertEquals(GestureBitmapView.DEFAULT_SCROLL_MARGIN, view.leftScrollMargin, 0.0f)
+        assertEquals(GestureBitmapView.DEFAULT_SCROLL_MARGIN, view.topScrollMargin, 0.0f)
+        assertEquals(GestureBitmapView.DEFAULT_SCROLL_MARGIN, view.rightScrollMargin, 0.0f)
+        assertEquals(GestureBitmapView.DEFAULT_SCROLL_MARGIN, view.bottomScrollMargin, 0.0f)
 
         val transformationParameters = view.transformationParameters
         assertEquals(1.0, transformationParameters.scale, 0.0)
@@ -182,10 +190,40 @@ class GestureBitmapViewTest {
         }.returns(2.0f)
         every {
             typedArray.getFloat(
-                R.styleable.GestureBitmapView_scaleMargin,
+                R.styleable.GestureBitmapView_minScaleMargin,
                 any()
             )
         }.returns(0.2f)
+        every {
+            typedArray.getFloat(
+                R.styleable.GestureBitmapView_maxScaleMargin,
+                any()
+            )
+        }.returns(2.0f)
+        every {
+            typedArray.getFloat(
+                R.styleable.GestureBitmapView_leftScrollMargin,
+                any()
+            )
+        }.returns(125.0f)
+        every {
+            typedArray.getFloat(
+                R.styleable.GestureBitmapView_topScrollMargin,
+                any()
+            )
+        }.returns(150.0f)
+        every {
+            typedArray.getFloat(
+                R.styleable.GestureBitmapView_rightScrollMargin,
+                any()
+            )
+        }.returns(175.0f)
+        every {
+            typedArray.getFloat(
+                R.styleable.GestureBitmapView_bottomScrollMargin,
+                any()
+            )
+        }.returns(200.0f)
 
         justRun { typedArray.recycle() }
 
@@ -206,7 +244,12 @@ class GestureBitmapViewTest {
         assertEquals(0.5f, view.minScale, 0.0f)
         assertEquals(5.0f, view.maxScale, 0.0f)
         assertEquals(2.0f, view.scaleFactorJump, 0.0f)
-        assertEquals(0.2f, view.scaleMargin, 0.0f)
+        assertEquals(0.2f, view.minScaleMargin, 0.0f)
+        assertEquals(2.0f, view.maxScaleMargin, 0.0f)
+        assertEquals(125.0f, view.leftScrollMargin, 0.0f)
+        assertEquals(150.0f, view.topScrollMargin, 0.0f)
+        assertEquals(175.0f, view.rightScrollMargin, 0.0f)
+        assertEquals(200.0f, view.bottomScrollMargin, 0.0f)
         verify(exactly = 2) { typedArray.recycle() }
     }
 
@@ -1843,18 +1886,129 @@ class GestureBitmapViewTest {
     }
 
     @Test
-    fun scaleMargin_returnsExpectedValue() {
+    fun minScaleMargin_returnsExpectedValue() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val view = GestureBitmapView(context)
 
         // check default value
-        assertEquals(GestureBitmapView.DEFAULT_SCALE_MARGIN, view.scaleMargin, 0.0f)
+        assertEquals(GestureBitmapView.DEFAULT_MIN_SCALE_MARGIN, view.minScaleMargin, 0.0f)
 
         // set new value
-        view.scaleMargin = 0.5f
+        view.minScaleMargin = 0.5f
 
         // check
-        assertEquals(0.5f, view.scaleMargin, 0.0f)
+        assertEquals(0.5f, view.minScaleMargin, 0.0f)
+    }
+
+    @Test
+    fun maxScaleMargin_returnsExpectedValue() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val view = GestureBitmapView(context)
+
+        // check default value
+        assertEquals(GestureBitmapView.DEFAULT_MAX_SCALE_MARGIN, view.maxScaleMargin, 0.0f)
+
+        // set new value
+        view.maxScaleMargin = 5.0f
+
+        // check
+        assertEquals(5.0f, view.maxScaleMargin, 0.0f)
+    }
+
+    @Test
+    fun leftScrollMargin_returnsExpectedValue() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val view = GestureBitmapView(context)
+
+        // check default value
+        assertEquals(GestureBitmapView.DEFAULT_SCROLL_MARGIN, view.leftScrollMargin, 0.0f)
+
+        // set new value
+        view.leftScrollMargin = 200.0f
+
+        // check
+        assertEquals(200.0f, view.leftScrollMargin, 0.0f)
+    }
+
+    @Test
+    fun leftScrollMargin_whenNegative_throwsIllegalArgumentException() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val view = GestureBitmapView(context)
+
+        // check default value
+        assertThrows(IllegalArgumentException::class.java) { view.leftScrollMargin = -1.0f }
+    }
+
+    @Test
+    fun topScrollMargin_returnsExpectedValue() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val view = GestureBitmapView(context)
+
+        // check default value
+        assertEquals(GestureBitmapView.DEFAULT_SCROLL_MARGIN, view.topScrollMargin, 0.0f)
+
+        // set new value
+        view.topScrollMargin = 201.0f
+
+        // check
+        assertEquals(201.0f, view.topScrollMargin, 0.0f)
+    }
+
+    @Test
+    fun topScrollMargin_whenNegative_throwsIllegalArgumentException() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val view = GestureBitmapView(context)
+
+        // check default value
+        assertThrows(IllegalArgumentException::class.java) { view.topScrollMargin = -1.0f }
+    }
+
+    @Test
+    fun rightScrollMargin_returnsExpectedValue() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val view = GestureBitmapView(context)
+
+        // check default value
+        assertEquals(GestureBitmapView.DEFAULT_SCROLL_MARGIN, view.rightScrollMargin, 0.0f)
+
+        // set new value
+        view.rightScrollMargin = 202.0f
+
+        // check
+        assertEquals(202.0f, view.rightScrollMargin, 0.0f)
+    }
+
+    @Test
+    fun rightScrollMargin_whenNegative_throwsIllegalArgumentException() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val view = GestureBitmapView(context)
+
+        // check default value
+        assertThrows(IllegalArgumentException::class.java) { view.rightScrollMargin = -1.0f }
+    }
+
+    @Test
+    fun bottomScrollMargin_returnsExpectedValue() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val view = GestureBitmapView(context)
+
+        // check default value
+        assertEquals(GestureBitmapView.DEFAULT_SCROLL_MARGIN, view.bottomScrollMargin, 0.0f)
+
+        // set new value
+        view.bottomScrollMargin = 203.0f
+
+        // check
+        assertEquals(203.0f, view.bottomScrollMargin, 0.0f)
+    }
+
+    @Test
+    fun bottomScrollMargin_whenNegative_throwsIllegalArgumentException() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val view = GestureBitmapView(context)
+
+        // check default value
+        assertThrows(IllegalArgumentException::class.java) { view.bottomScrollMargin = -1.0f }
     }
 
     @Test
@@ -2010,6 +2164,128 @@ class GestureBitmapViewTest {
     }
 
     @Test
+    fun onTouchEvent_whenEverythingDisabled_doesNotCallAnyGestureDetector() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val view = GestureBitmapView(context)
+
+        view.twoFingerScrollEnabled = false
+        view.scrollEnabled = false
+        view.scaleEnabled = false
+        view.rotationEnabled = false
+
+        val (rotationGestureDetectorSpy, scaleGestureDetectorSpy, gestureDetectorSpy) = addSpies(
+            view
+        )
+
+        val event = mockk<MotionEvent>()
+        every { event.action }.returns(MotionEvent.ACTION_DOWN)
+
+        view.onTouchEvent(event)
+
+        verify { rotationGestureDetectorSpy wasNot Called }
+        verify { scaleGestureDetectorSpy wasNot Called }
+        verify { gestureDetectorSpy wasNot Called }
+    }
+
+    @Test
+    fun onTouchEvent_whenEverythingEnabled_callsAllGestureDetectors() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val view = GestureBitmapView(context)
+
+        view.twoFingerScrollEnabled = true
+        view.scrollEnabled = true
+        view.scaleEnabled = true
+        view.rotationEnabled = true
+
+        val (rotationGestureDetectorSpy, scaleGestureDetectorSpy, gestureDetectorSpy) = addSpies(
+            view
+        )
+
+        val event = mockk<MotionEvent>()
+        every { event.action }.returns(MotionEvent.ACTION_DOWN)
+
+        every { gestureDetectorSpy.onTouchEvent(event) }.returns(false)
+        every { rotationGestureDetectorSpy.onTouchEvent(event) }.returns(false)
+        every { scaleGestureDetectorSpy.onTouchEvent(event) }.returns(false)
+
+        view.onTouchEvent(event)
+
+        assertTrue(view.rotationEnabled)
+        assertTrue(view.scaleEnabled)
+        assertTrue(view.scrollEnabled)
+        assertTrue(view.twoFingerScrollEnabled)
+
+        verify(exactly = 1) { gestureDetectorSpy.onTouchEvent(event) }
+        confirmVerified(gestureDetectorSpy)
+        verify(exactly = 1) { scaleGestureDetectorSpy.onTouchEvent(event) }
+        confirmVerified(scaleGestureDetectorSpy)
+        verify(exactly = 1) { rotationGestureDetectorSpy.onTouchEvent(event) }
+        confirmVerified(rotationGestureDetectorSpy)
+    }
+
+    @Test
+    fun onTouchEvent_whenScaleNotEnabled_doesNotCallScaleGestureDetector() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val view = GestureBitmapView(context)
+
+        view.scaleEnabled = false
+
+        val (rotationGestureDetectorSpy, scaleGestureDetectorSpy, gestureDetectorSpy) = addSpies(
+            view
+        )
+
+        val event = mockk<MotionEvent>()
+        every { event.action }.returns(MotionEvent.ACTION_DOWN)
+
+        every { gestureDetectorSpy.onTouchEvent(event) }.returns(false)
+        every { rotationGestureDetectorSpy.onTouchEvent(event) }.returns(false)
+
+        view.onTouchEvent(event)
+
+        assertTrue(view.rotationEnabled)
+        assertFalse(view.scaleEnabled)
+        assertTrue(view.scrollEnabled)
+        assertTrue(view.twoFingerScrollEnabled)
+
+        verify(exactly = 1) { rotationGestureDetectorSpy.onTouchEvent(event) }
+        verify { scaleGestureDetectorSpy wasNot Called }
+        verify(exactly = 1) { gestureDetectorSpy.onTouchEvent(event) }
+    }
+
+    @Test
+    fun onTouchEvent_whenScaleEnabled_doesCallScaleGestureDetectorButNotGestureDetector() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val view = GestureBitmapView(context)
+
+        view.scaleEnabled = true
+
+        val (rotationGestureDetectorSpy, scaleGestureDetectorSpy, gestureDetectorSpy) = addSpies(
+            view
+        )
+
+        val event = mockk<MotionEvent>()
+        every { event.action }.returns(MotionEvent.ACTION_DOWN)
+
+        every { gestureDetectorSpy.onTouchEvent(event) }.returns(false)
+        every { rotationGestureDetectorSpy.onTouchEvent(event) }.returns(false)
+        every { scaleGestureDetectorSpy.onTouchEvent(event) }.returns(true)
+
+        view.onTouchEvent(event)
+
+        assertTrue(view.rotationEnabled)
+        assertTrue(view.scaleEnabled)
+        assertTrue(view.scrollEnabled)
+        assertTrue(view.twoFingerScrollEnabled)
+
+        verify(exactly = 1) { gestureDetectorSpy.onTouchEvent(event) }
+        confirmVerified(gestureDetectorSpy)
+        verify(exactly = 1) { scaleGestureDetectorSpy.onTouchEvent(event) }
+        confirmVerified(scaleGestureDetectorSpy)
+        verify(exactly = 1) { rotationGestureDetectorSpy.onTouchEvent(event) }
+        confirmVerified(rotationGestureDetectorSpy)
+    }
+
+    @Test
     fun onTouchEvent_whenRotationNotEnabled_doesNotCallRotationGestureDetector() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val view = GestureBitmapView(context)
@@ -2067,104 +2343,6 @@ class GestureBitmapViewTest {
     }
 
     @Test
-    fun onTouchEvent_whenScaleNotEnabled_doesNotCallRotationGestureDetector() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val view = GestureBitmapView(context)
-
-        view.scaleEnabled = false
-
-        val (rotationGestureDetectorSpy, scaleGestureDetectorSpy, gestureDetectorSpy) = addSpies(
-            view
-        )
-
-        val event = mockk<MotionEvent>()
-        every { event.action }.returns(MotionEvent.ACTION_DOWN)
-
-        every { gestureDetectorSpy.onTouchEvent(event) }.returns(false)
-        every { rotationGestureDetectorSpy.onTouchEvent(event) }.returns(false)
-        every { scaleGestureDetectorSpy.isInProgress }.returns(false)
-
-        view.onTouchEvent(event)
-
-        assertTrue(view.rotationEnabled)
-        assertFalse(view.scaleEnabled)
-        assertTrue(view.scrollEnabled)
-        assertTrue(view.twoFingerScrollEnabled)
-
-        verify(exactly = 1) { rotationGestureDetectorSpy.onTouchEvent(event) }
-        verify(exactly = 1) { scaleGestureDetectorSpy.isInProgress }
-        verify(exactly = 0) { scaleGestureDetectorSpy.onTouchEvent(any()) }
-        confirmVerified(scaleGestureDetectorSpy)
-        verify(exactly = 1) { gestureDetectorSpy.onTouchEvent(event) }
-    }
-
-    @Test
-    fun onTouchEvent_whenScaleEnabledTwoFingerScrollDisabledAndScaleInProgress_doesCallRotationGestureDetectorButNotGestureDetector() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val view = GestureBitmapView(context)
-
-        view.scaleEnabled = true
-        view.twoFingerScrollEnabled = false
-
-        val (rotationGestureDetectorSpy, scaleGestureDetectorSpy, gestureDetectorSpy) = addSpies(
-            view
-        )
-
-        val event = mockk<MotionEvent>()
-        every { event.action }.returns(MotionEvent.ACTION_DOWN)
-
-        every { rotationGestureDetectorSpy.onTouchEvent(event) }.returns(false)
-        every { scaleGestureDetectorSpy.isInProgress }.returns(true)
-        every { scaleGestureDetectorSpy.onTouchEvent(event) }.returns(true)
-
-        view.onTouchEvent(event)
-
-        assertTrue(view.rotationEnabled)
-        assertTrue(view.scaleEnabled)
-        assertTrue(view.scrollEnabled)
-        assertFalse(view.twoFingerScrollEnabled)
-
-        verify(exactly = 1) { rotationGestureDetectorSpy.onTouchEvent(event) }
-        verify(exactly = 1) { scaleGestureDetectorSpy.isInProgress }
-        verify(exactly = 1) { scaleGestureDetectorSpy.onTouchEvent(event) }
-        confirmVerified(scaleGestureDetectorSpy)
-        verify { gestureDetectorSpy wasNot Called }
-    }
-
-    @Test
-    fun onTouchEvent_whenScaleEnabledAndNotInProgress_doesCallRotationGestureDetectorAndGestureDetector() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val view = GestureBitmapView(context)
-
-        view.scaleEnabled = true
-
-        val (rotationGestureDetectorSpy, scaleGestureDetectorSpy, gestureDetectorSpy) = addSpies(
-            view
-        )
-
-        val event = mockk<MotionEvent>()
-        every { event.action }.returns(MotionEvent.ACTION_DOWN)
-
-        every { gestureDetectorSpy.onTouchEvent(event) }.returns(false)
-        every { rotationGestureDetectorSpy.onTouchEvent(event) }.returns(false)
-        every { scaleGestureDetectorSpy.isInProgress }.returns(false)
-        every { scaleGestureDetectorSpy.onTouchEvent(event) }.returns(true)
-
-        view.onTouchEvent(event)
-
-        assertTrue(view.rotationEnabled)
-        assertTrue(view.scaleEnabled)
-        assertTrue(view.scrollEnabled)
-        assertTrue(view.twoFingerScrollEnabled)
-
-        verify(exactly = 1) { rotationGestureDetectorSpy.onTouchEvent(event) }
-        verify(exactly = 1) { scaleGestureDetectorSpy.isInProgress }
-        verify(exactly = 1) { scaleGestureDetectorSpy.onTouchEvent(event) }
-        confirmVerified(scaleGestureDetectorSpy)
-        verify(exactly = 1) { gestureDetectorSpy.onTouchEvent(event) }
-    }
-
-    @Test
     fun onTouchEvent_whenActionUpAndScaleWithinRange_doesNotLimitsScale() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val view = GestureBitmapView(context)
@@ -2184,7 +2362,6 @@ class GestureBitmapViewTest {
 
         every { gestureDetectorSpy.onTouchEvent(event) }.returns(false)
         every { rotationGestureDetectorSpy.onTouchEvent(event) }.returns(false)
-        every { scaleGestureDetectorSpy.isInProgress }.returns(false)
         every { scaleGestureDetectorSpy.onTouchEvent(event) }.returns(true)
 
         view.onTouchEvent(event)
@@ -2194,7 +2371,6 @@ class GestureBitmapViewTest {
         assertTrue(view.scrollEnabled)
         assertTrue(view.twoFingerScrollEnabled)
 
-        verify(exactly = 1) { scaleGestureDetectorSpy.isInProgress }
         verify(exactly = 1) { scaleGestureDetectorSpy.onTouchEvent(event) }
         confirmVerified(scaleGestureDetectorSpy)
 
@@ -2233,7 +2409,6 @@ class GestureBitmapViewTest {
 
         every { gestureDetectorSpy.onTouchEvent(event) }.returns(false)
         every { rotationGestureDetectorSpy.onTouchEvent(event) }.returns(false)
-        every { scaleGestureDetectorSpy.isInProgress }.returns(false)
         every { scaleGestureDetectorSpy.onTouchEvent(event) }.returns(true)
         every { scaleGestureDetectorSpy.focusX }.returns(100.0f)
         every { scaleGestureDetectorSpy.focusY }.returns(50.0f)
@@ -2245,7 +2420,6 @@ class GestureBitmapViewTest {
         assertTrue(view.scrollEnabled)
         assertTrue(view.twoFingerScrollEnabled)
 
-        verify(exactly = 1) { scaleGestureDetectorSpy.isInProgress }
         verify(exactly = 1) { scaleGestureDetectorSpy.onTouchEvent(event) }
         verify(exactly = 1) { scaleGestureDetectorSpy.focusX }
         verify(exactly = 1) { scaleGestureDetectorSpy.focusY }
@@ -2293,7 +2467,6 @@ class GestureBitmapViewTest {
 
         every { gestureDetectorSpy.onTouchEvent(event) }.returns(false)
         every { rotationGestureDetectorSpy.onTouchEvent(event) }.returns(false)
-        every { scaleGestureDetectorSpy.isInProgress }.returns(false)
         every { scaleGestureDetectorSpy.onTouchEvent(event) }.returns(true)
         every { scaleGestureDetectorSpy.focusX }.returns(100.0f)
         every { scaleGestureDetectorSpy.focusY }.returns(50.0f)
@@ -2305,7 +2478,6 @@ class GestureBitmapViewTest {
         assertTrue(view.scrollEnabled)
         assertTrue(view.twoFingerScrollEnabled)
 
-        verify(exactly = 1) { scaleGestureDetectorSpy.isInProgress }
         verify(exactly = 1) { scaleGestureDetectorSpy.onTouchEvent(event) }
         verify(exactly = 1) { scaleGestureDetectorSpy.focusX }
         verify(exactly = 1) { scaleGestureDetectorSpy.focusY }
@@ -2345,21 +2517,34 @@ class GestureBitmapViewTest {
 
         every { gestureDetectorSpy.onTouchEvent(event) }.returns(false)
         every { rotationGestureDetectorSpy.onTouchEvent(event) }.returns(false)
-        every { scaleGestureDetectorSpy.isInProgress }.returns(false)
         every { scaleGestureDetectorSpy.onTouchEvent(event) }.returns(true)
         every { scaleGestureDetectorSpy.focusX }.returns(100.0f)
         every { scaleGestureDetectorSpy.focusY }.returns(50.0f)
+
+        val translateAnimator = mockk<ValueAnimator>()
+        every { translateAnimator.isRunning }.returns(true)
+        justRun { translateAnimator.cancel() }
+        view.setPrivateProperty("translateAnimator", translateAnimator)
 
         val scaleAnimator = mockk<ValueAnimator>()
         every { scaleAnimator.isRunning }.returns(true)
         justRun { scaleAnimator.cancel() }
         view.setPrivateProperty("scaleAnimator", scaleAnimator)
 
+        val rotateAndTranslateAnimator = mockk<ValueAnimator>()
+        every { rotateAndTranslateAnimator.isRunning }.returns(true)
+        justRun { rotateAndTranslateAnimator.cancel() }
+        view.setPrivateProperty("rotateAndTranslateAnimator", rotateAndTranslateAnimator)
+
         view.onTouchEvent(event)
 
-        // previous animator is cancelled
+        // previous animators are cancelled and scale animator is reset
+        verify(exactly = 1) { translateAnimator.isRunning }
+        verify(exactly = 1) { translateAnimator.cancel() }
         verify(exactly = 1) { scaleAnimator.isRunning }
         verify(exactly = 1) { scaleAnimator.cancel() }
+        verify(exactly = 1) { rotateAndTranslateAnimator.isRunning }
+        verify(exactly = 1) { rotateAndTranslateAnimator.cancel() }
         assertNotSame(scaleAnimator, view.getPrivateProperty("scaleAnimator"))
     }
 
@@ -2478,29 +2663,26 @@ class GestureBitmapViewTest {
         displayMatrix?.getValues(displayMatrixValues)
         assertArrayEquals(displayMatrixValues, bundle.getFloatArray(DISPLAY_MATRIX_KEY), 0.0f)
 
-        assertTrue(bundle.containsKey(INVERSE_DISPLAY_MATRIX_KEY))
-        val inverseDisplayMatrix: Matrix? = view.getPrivateProperty(INVERSE_DISPLAY_MATRIX_KEY)
-        val inverseDisplayMatrixValues =
-            FloatArray(MetricTransformationParameters.MATRIX_VALUES_LENGTH)
-        inverseDisplayMatrix?.getValues(inverseDisplayMatrixValues)
-        assertArrayEquals(
-            inverseDisplayMatrixValues,
-            bundle.getFloatArray(INVERSE_DISPLAY_MATRIX_KEY),
-            0.0f
-        )
-
         assertEquals(view.rotationEnabled, bundle.getBoolean(ROTATION_ENABLED_KEY))
         assertEquals(view.scaleEnabled, bundle.getBoolean(SCALE_ENABLED_KEY))
         assertEquals(view.scrollEnabled, bundle.getBoolean(SCROLL_ENABLED_KEY))
         assertEquals(view.twoFingerScrollEnabled, bundle.getBoolean(TWO_FINGER_SCROLL_ENABLED_KEY))
-        assertEquals(view.exclusiveTwoFingerScrollEnabled, bundle.getBoolean(
-            EXCLUSIVE_TWO_FINGER_SCROLL_ENABLED_KEY))
+        assertEquals(
+            view.exclusiveTwoFingerScrollEnabled, bundle.getBoolean(
+                EXCLUSIVE_TWO_FINGER_SCROLL_ENABLED_KEY
+            )
+        )
         assertEquals(view.doubleTapEnabled, bundle.getBoolean(DOUBLE_TAP_ENABLED_KEY))
         assertEquals(view.displayType, bundle.getSerializable(DISPLAY_TYPE_KEY))
         assertEquals(view.minScale, bundle.getFloat(MIN_SCALE_KEY), 0.0f)
         assertEquals(view.maxScale, bundle.getFloat(MAX_SCALE_KEY), 0.0f)
         assertEquals(view.scaleFactorJump, bundle.getFloat(SCALE_FACTOR_JUMP_KEY), 0.0f)
-        assertEquals(view.scaleMargin, bundle.getFloat(SCALE_MARGIN_KEY), 0.0f)
+        assertEquals(view.minScaleMargin, bundle.getFloat(MIN_SCALE_MARGIN_KEY), 0.0f)
+        assertEquals(view.maxScaleMargin, bundle.getFloat(MAX_SCALE_MARGIN_KEY), 0.0f)
+        assertEquals(view.leftScrollMargin, bundle.getFloat(LEFT_SCROLL_MARGIN_KEY), 0.0f)
+        assertEquals(view.topScrollMargin, bundle.getFloat(TOP_SCROLL_MARGIN_KEY), 0.0f)
+        assertEquals(view.rightScrollMargin, bundle.getFloat(RIGHT_SCROLL_MARGIN_KEY), 0.0f)
+        assertEquals(view.bottomScrollMargin, bundle.getFloat(BOTTOM_SCROLL_MARGIN_KEY), 0.0f)
     }
 
     @Test
@@ -2513,7 +2695,6 @@ class GestureBitmapViewTest {
         assertEquals(identity, view.baseTransformationMatrix)
         assertEquals(identity, view.transformationMatrix)
         assertEquals(identity, view.displayTransformationMatrix)
-        assertEquals(identity, view.getPrivateProperty(INVERSE_DISPLAY_MATRIX_KEY))
         assertTrue(view.rotationEnabled)
         assertTrue(view.scaleEnabled)
         assertTrue(view.scrollEnabled)
@@ -2524,7 +2705,12 @@ class GestureBitmapViewTest {
         assertEquals(1.0f, view.minScale, 0.0f)
         assertEquals(10.0f, view.maxScale, 0.0f)
         assertEquals(3.0f, view.scaleFactorJump, 0.0f)
-        assertEquals(0.1f, view.scaleMargin, 0.0f)
+        assertEquals(0.1f, view.minScaleMargin, 0.0f)
+        assertEquals(1.0f, view.maxScaleMargin, 0.0f)
+        assertEquals(100.0f, view.leftScrollMargin, 0.0f)
+        assertEquals(100.0f, view.topScrollMargin, 0.0f)
+        assertEquals(100.0f, view.rightScrollMargin, 0.0f)
+        assertEquals(100.0f, view.bottomScrollMargin, 0.0f)
 
         // prepare bundle to restore from
         val bundle = Bundle()
@@ -2545,13 +2731,6 @@ class GestureBitmapViewTest {
         displayMatrix.getValues(displayMatrixValues)
         bundle.putFloatArray(DISPLAY_MATRIX_KEY, displayMatrixValues)
 
-        val inverseDisplayMatrix = Matrix()
-        displayMatrix.invert(inverseDisplayMatrix)
-        val inverseDisplayMatrixValues =
-            FloatArray(MetricTransformationParameters.MATRIX_VALUES_LENGTH)
-        inverseDisplayMatrix.getValues(inverseDisplayMatrixValues)
-        bundle.putFloatArray(INVERSE_DISPLAY_MATRIX_KEY, inverseDisplayMatrixValues)
-
         bundle.putBoolean(ROTATION_ENABLED_KEY, false)
         bundle.putBoolean(SCALE_ENABLED_KEY, false)
         bundle.putBoolean(SCROLL_ENABLED_KEY, false)
@@ -2564,7 +2743,12 @@ class GestureBitmapViewTest {
         bundle.putFloat(MIN_SCALE_KEY, 0.5f)
         bundle.putFloat(MAX_SCALE_KEY, 3.0f)
         bundle.putFloat(SCALE_FACTOR_JUMP_KEY, 5.0f)
-        bundle.putFloat(SCALE_MARGIN_KEY, 0.2f)
+        bundle.putFloat(MIN_SCALE_MARGIN_KEY, 0.2f)
+        bundle.putFloat(MAX_SCALE_MARGIN_KEY, 10.0f)
+        bundle.putFloat(LEFT_SCROLL_MARGIN_KEY, 101.0f)
+        bundle.putFloat(TOP_SCROLL_MARGIN_KEY, 102.0f)
+        bundle.putFloat(RIGHT_SCROLL_MARGIN_KEY, 103.0f)
+        bundle.putFloat(BOTTOM_SCROLL_MARGIN_KEY, 104.0f)
 
         // restore state
         view.callPrivateFunc("onRestoreInstanceState", bundle)
@@ -2573,7 +2757,6 @@ class GestureBitmapViewTest {
         assertEquals(baseMatrix, view.baseTransformationMatrix)
         assertEquals(paramsMatrix, view.transformationMatrix)
         assertEquals(displayMatrix, view.displayTransformationMatrix)
-        assertEquals(inverseDisplayMatrix, view.getPrivateProperty(INVERSE_DISPLAY_MATRIX_KEY))
         assertFalse(view.rotationEnabled)
         assertFalse(view.scaleEnabled)
         assertFalse(view.scrollEnabled)
@@ -2584,7 +2767,12 @@ class GestureBitmapViewTest {
         assertEquals(0.5f, view.minScale, 0.0f)
         assertEquals(3.0f, view.maxScale, 0.0f)
         assertEquals(5.0f, view.scaleFactorJump, 0.0f)
-        assertEquals(0.2f, view.scaleMargin, 0.0f)
+        assertEquals(0.2f, view.minScaleMargin, 0.0f)
+        assertEquals(10.0f, view.maxScaleMargin, 0.0f)
+        assertEquals(101.0f, view.leftScrollMargin, 0.0f)
+        assertEquals(102.0f, view.topScrollMargin, 0.0f)
+        assertEquals(103.0f, view.rightScrollMargin, 0.0f)
+        assertEquals(104.0f, view.bottomScrollMargin, 0.0f)
     }
 
     @Test
@@ -2961,6 +3149,14 @@ class GestureBitmapViewTest {
             mockk<GestureBitmapView.OnScaleAnimationCompletedListener>(relaxUnitFun = true)
         view.scaleAnimationCompletedListener = scaleAnimationCompletedListener
 
+        val translateAnimator = mockk<ValueAnimator>()
+        every { translateAnimator.isRunning }.returns(true)
+        justRun { translateAnimator.cancel() }
+        view.setPrivateProperty("translateAnimator", translateAnimator)
+        val scaleAnimator = mockk<ValueAnimator>()
+        every { scaleAnimator.isRunning }.returns(true)
+        justRun { scaleAnimator.cancel() }
+        view.setPrivateProperty("scaleAnimator", scaleAnimator)
         val rotateAndTranslateAnimator = mockk<ValueAnimator>()
         every { rotateAndTranslateAnimator.isRunning }.returns(true)
         justRun { rotateAndTranslateAnimator.cancel() }
@@ -2999,6 +3195,9 @@ class GestureBitmapViewTest {
 
         // check
         verify(exactly = 1) { doubleTapListener.onDoubleTap(view) }
+        verify(exactly = 1) { translateAnimator.cancel() }
+        verify(exactly = 1) { scaleAnimator.cancel() }
+        verify(exactly = 1) { rotateAndTranslateAnimator.cancel() }
 
         //finish animation
         Shadows.shadowOf(Looper.getMainLooper()).idle()
@@ -3215,44 +3414,7 @@ class GestureBitmapViewTest {
     }
 
     @Test
-    fun gestureFling_whenNonExclusiveAndScaleGestureDetectorIsInProgress_makesNoAction() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val view = GestureBitmapView(context)
-
-        val gestureDetector: GestureDetector? = view.getPrivateProperty("gestureDetector")
-        val gestureDetectorListener: GestureDetector.SimpleOnGestureListener? =
-            gestureDetector?.getPrivateProperty("mListener")
-
-        require(gestureDetectorListener != null)
-
-        view.scrollEnabled = true
-        view.twoFingerScrollEnabled = false
-        view.exclusiveTwoFingerScrollEnabled = false
-
-        val scaleGestureDetector: ScaleGestureDetector? =
-            view.getPrivateProperty("scaleGestureDetector")
-        assertNotNull(scaleGestureDetector)
-
-        val scaleGestureDetectorSpy = spyk(scaleGestureDetector as ScaleGestureDetector)
-        view.setPrivateProperty("scaleGestureDetector", scaleGestureDetectorSpy)
-        every { scaleGestureDetectorSpy.isInProgress }.returns(true)
-
-        val event2 = mockk<MotionEvent>()
-        every { event2.pointerCount }.returns(2)
-
-        val transformationParameters = view.transformationParameters
-        assertEquals(0.0, transformationParameters.horizontalTranslation, 0.0)
-        assertEquals(0.0, transformationParameters.verticalTranslation, 0.0)
-
-        // execute fling
-        assertFalse(gestureDetectorListener.onFling(event2, event2, 1.0f, 1.0f))
-
-        // check that transformation has not changed
-        assertEquals(transformationParameters, view.transformationParameters)
-    }
-
-    @Test
-    fun gestureFling_whenScaleGestureDetectorIsInProgress_makesNoAction() {
+    fun gestureFling_whenNonExclusiveAndUnitScale_makesNoAction() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val view = GestureBitmapView(context)
 
@@ -3264,50 +3426,6 @@ class GestureBitmapViewTest {
 
         view.scrollEnabled = true
         view.twoFingerScrollEnabled = true
-
-        val scaleGestureDetector: ScaleGestureDetector? =
-            view.getPrivateProperty("scaleGestureDetector")
-        assertNotNull(scaleGestureDetector)
-
-        val scaleGestureDetectorSpy = spyk(scaleGestureDetector as ScaleGestureDetector)
-        view.setPrivateProperty("scaleGestureDetector", scaleGestureDetectorSpy)
-        every { scaleGestureDetectorSpy.isInProgress }.returns(true)
-
-        val event2 = mockk<MotionEvent>()
-        every { event2.pointerCount }.returns(2)
-
-        val transformationParameters = view.transformationParameters
-        assertEquals(0.0, transformationParameters.horizontalTranslation, 0.0)
-        assertEquals(0.0, transformationParameters.verticalTranslation, 0.0)
-
-        // execute fling
-        assertFalse(gestureDetectorListener.onFling(event2, event2, 1.0f, 1.0f))
-
-        // check that transformation has not changed
-        assertEquals(transformationParameters, view.transformationParameters)
-    }
-
-    @Test
-    fun gestureFling_whenScaleGestureDetectorIsNotInProgressAndUnitScale_makesNoAction() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val view = GestureBitmapView(context)
-
-        val gestureDetector: GestureDetector? = view.getPrivateProperty("gestureDetector")
-        val gestureDetectorListener: GestureDetector.SimpleOnGestureListener? =
-            gestureDetector?.getPrivateProperty("mListener")
-
-        require(gestureDetectorListener != null)
-
-        view.scrollEnabled = true
-        view.twoFingerScrollEnabled = true
-
-        val scaleGestureDetector: ScaleGestureDetector? =
-            view.getPrivateProperty("scaleGestureDetector")
-        assertNotNull(scaleGestureDetector)
-
-        val scaleGestureDetectorSpy = spyk(scaleGestureDetector as ScaleGestureDetector)
-        view.setPrivateProperty("scaleGestureDetector", scaleGestureDetectorSpy)
-        every { scaleGestureDetectorSpy.isInProgress }.returns(false)
 
         val event2 = mockk<MotionEvent>()
         every { event2.pointerCount }.returns(2)
@@ -3316,7 +3434,7 @@ class GestureBitmapViewTest {
         assertEquals(1.0, transformationParameters.scale, 0.0)
 
         // execute fling
-        assertFalse(gestureDetectorListener.onFling(event2, event2, 1.0f, 1.0f))
+        assertTrue(gestureDetectorListener.onFling(event2, event2, 1.0f, 1.0f))
 
         // check that transformation has not changed
         assertEquals(transformationParameters, view.transformationParameters)
@@ -3324,7 +3442,7 @@ class GestureBitmapViewTest {
 
     @LooperMode(LooperMode.Mode.PAUSED)
     @Test
-    fun gestureFling_whenScaleGestureDetectorIsNotInProgressAndGreaterThan1Scale_makesScroll() {
+    fun gestureFling_whenNonExclusiveAndGreaterThan1Scale_makesScroll() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val view = GestureBitmapView(context)
 
@@ -3336,20 +3454,13 @@ class GestureBitmapViewTest {
 
         view.scrollEnabled = true
         view.twoFingerScrollEnabled = true
+        view.exclusiveTwoFingerScrollEnabled = false
 
         view.measure(
             View.MeasureSpec.makeMeasureSpec(1080, View.MeasureSpec.EXACTLY),
             View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY)
         )
         view.layout(0, 0, 1080, 1920)
-
-        val scaleGestureDetector: ScaleGestureDetector? =
-            view.getPrivateProperty("scaleGestureDetector")
-        assertNotNull(scaleGestureDetector)
-
-        val scaleGestureDetectorSpy = spyk(scaleGestureDetector as ScaleGestureDetector)
-        view.setPrivateProperty("scaleGestureDetector", scaleGestureDetectorSpy)
-        every { scaleGestureDetectorSpy.isInProgress }.returns(false)
 
         val event2 = mockk<MotionEvent>()
         every { event2.pointerCount }.returns(2)
@@ -3403,7 +3514,7 @@ class GestureBitmapViewTest {
     }
 
     @Test
-    fun gestureFling_whenTranslateAnimatorIsRunning_cancelsPreviousAnimator() {
+    fun gestureFling_whenAnimatorsAreRunning_cancelsPreviousAnimators() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val view = GestureBitmapView(context)
 
@@ -3428,12 +3539,19 @@ class GestureBitmapViewTest {
 
         val scaleGestureDetectorSpy = spyk(scaleGestureDetector as ScaleGestureDetector)
         view.setPrivateProperty("scaleGestureDetector", scaleGestureDetectorSpy)
-        every { scaleGestureDetectorSpy.isInProgress }.returns(false)
 
         val translateAnimator = mockk<ValueAnimator>()
         every { translateAnimator.isRunning }.returns(true)
         justRun { translateAnimator.cancel() }
         view.setPrivateProperty("translateAnimator", translateAnimator)
+        val scaleAnimator = mockk<ValueAnimator>()
+        every { scaleAnimator.isRunning }.returns(true)
+        justRun { scaleAnimator.cancel() }
+        view.setPrivateProperty("scaleAnimator", scaleAnimator)
+        val rotateAndTranslateAnimator = mockk<ValueAnimator>()
+        every { rotateAndTranslateAnimator.isRunning }.returns(true)
+        justRun { rotateAndTranslateAnimator.cancel() }
+        view.setPrivateProperty("rotateAndTranslateAnimator", rotateAndTranslateAnimator)
 
         val event2 = mockk<MotionEvent>()
         every { event2.pointerCount }.returns(2)
@@ -3449,6 +3567,10 @@ class GestureBitmapViewTest {
 
         view.bitmap = bitmap
 
+        verify(exactly = 1) { translateAnimator.cancel() }
+        verify(exactly = 1) { scaleAnimator.cancel() }
+        verify(exactly = 1) { rotateAndTranslateAnimator.cancel() }
+
         // set a scale larger than one after setting bitmap (otherwise scale is reset)
         transformationParameters1.scale = 2.0
         // make sure that bitmap is centered so that sroll is not limited
@@ -3456,11 +3578,17 @@ class GestureBitmapViewTest {
         transformationParameters1.verticalTranslation = (-view.height / 2).toDouble()
         view.transformationParameters = transformationParameters1
 
+        verify(exactly = 2) { translateAnimator.cancel() }
+        verify(exactly = 2) { scaleAnimator.cancel() }
+        verify(exactly = 2) { rotateAndTranslateAnimator.cancel() }
+
         // execute fling
         assertTrue(gestureDetectorListener.onFling(event2, event2, 1.0f, 1.0f))
 
         // check
-        verify(exactly = 1) { translateAnimator.cancel() }
+        verify(exactly = 3) { translateAnimator.cancel() }
+        verify(exactly = 3) { scaleAnimator.cancel() }
+        verify(exactly = 3) { rotateAndTranslateAnimator.cancel() }
     }
 
     @LooperMode(LooperMode.Mode.PAUSED)
@@ -3488,10 +3616,6 @@ class GestureBitmapViewTest {
         val scaleGestureDetector: ScaleGestureDetector? =
             view.getPrivateProperty("scaleGestureDetector")
         assertNotNull(scaleGestureDetector)
-
-        val scaleGestureDetectorSpy = spyk(scaleGestureDetector as ScaleGestureDetector)
-        view.setPrivateProperty("scaleGestureDetector", scaleGestureDetectorSpy)
-        every { scaleGestureDetectorSpy.isInProgress }.returns(false)
 
         val event2 = mockk<MotionEvent>()
         every { event2.pointerCount }.returns(2)
@@ -3573,10 +3697,6 @@ class GestureBitmapViewTest {
             view.getPrivateProperty("scaleGestureDetector")
         assertNotNull(scaleGestureDetector)
 
-        val scaleGestureDetectorSpy = spyk(scaleGestureDetector as ScaleGestureDetector)
-        view.setPrivateProperty("scaleGestureDetector", scaleGestureDetectorSpy)
-        every { scaleGestureDetectorSpy.isInProgress }.returns(false)
-
         val event2 = mockk<MotionEvent>()
         every { event2.pointerCount }.returns(2)
 
@@ -3653,14 +3773,6 @@ class GestureBitmapViewTest {
         )
         view.layout(0, 0, 1080, 1920)
 
-        val scaleGestureDetector: ScaleGestureDetector? =
-            view.getPrivateProperty("scaleGestureDetector")
-        assertNotNull(scaleGestureDetector)
-
-        val scaleGestureDetectorSpy = spyk(scaleGestureDetector as ScaleGestureDetector)
-        view.setPrivateProperty("scaleGestureDetector", scaleGestureDetectorSpy)
-        every { scaleGestureDetectorSpy.isInProgress }.returns(false)
-
         val event2 = mockk<MotionEvent>()
         every { event2.pointerCount }.returns(2)
 
@@ -3678,7 +3790,7 @@ class GestureBitmapViewTest {
         // set a scale larger than one after setting bitmap (otherwise scale is reset)
         transformationParameters1.scale = 2.0
         transformationParameters1.horizontalTranslation = (-view.width / 2).toDouble()
-        transformationParameters1.verticalTranslation = 0.0
+        transformationParameters1.verticalTranslation = -0.1
         view.transformationParameters = transformationParameters1
 
         val scrollAnimationCompletedListener =
@@ -3688,6 +3800,9 @@ class GestureBitmapViewTest {
         val topBoundReachedListener =
             mockk<GestureBitmapView.OnTopBoundReachedListener>(relaxUnitFun = true)
         view.topBoundReachedListener = topBoundReachedListener
+
+        // update start displayed rectangle coordinates
+        view.callPrivateFunc("updateStartDisplayedRectangleCoordinates")
 
         // execute fling
         assertTrue(gestureDetectorListener.onFling(event2, event2, 1.0f, 1.0f))
@@ -3713,11 +3828,8 @@ class GestureBitmapViewTest {
             transformationParameters2.horizontalTranslation, 0.0
         )
 
-        // vertical scroll has been limited
-        assertEquals(
-            transformationParameters1.verticalTranslation,
-            transformationParameters2.verticalTranslation, 0.0
-        )
+        // vertical scroll has been snapped to top border
+        assertEquals(0.0, transformationParameters2.verticalTranslation, 0.0)
     }
 
     @LooperMode(LooperMode.Mode.PAUSED)
@@ -3742,14 +3854,6 @@ class GestureBitmapViewTest {
         )
         view.layout(0, 0, 1080, 1920)
 
-        val scaleGestureDetector: ScaleGestureDetector? =
-            view.getPrivateProperty("scaleGestureDetector")
-        assertNotNull(scaleGestureDetector)
-
-        val scaleGestureDetectorSpy = spyk(scaleGestureDetector as ScaleGestureDetector)
-        view.setPrivateProperty("scaleGestureDetector", scaleGestureDetectorSpy)
-        every { scaleGestureDetectorSpy.isInProgress }.returns(false)
-
         val event2 = mockk<MotionEvent>()
         every { event2.pointerCount }.returns(2)
 
@@ -3767,7 +3871,7 @@ class GestureBitmapViewTest {
         // set a scale larger than one after setting bitmap (otherwise scale is reset)
         transformationParameters1.scale = 2.0
         transformationParameters1.horizontalTranslation = 0.0
-        transformationParameters1.verticalTranslation = -view.height.toDouble()
+        transformationParameters1.verticalTranslation = -view.height.toDouble() + 0.1
         view.transformationParameters = transformationParameters1
 
         val scrollAnimationCompletedListener =
@@ -3777,6 +3881,9 @@ class GestureBitmapViewTest {
         val bottomBoundReachedListener =
             mockk<GestureBitmapView.OnBottomBoundReachedListener>(relaxUnitFun = true)
         view.bottomBoundReachedListener = bottomBoundReachedListener
+
+        // update start displayed rectangle coordinates
+        view.callPrivateFunc("updateStartDisplayedRectangleCoordinates")
 
         // execute fling
         assertTrue(gestureDetectorListener.onFling(event2, event2, -1.0f, -1.0f))
@@ -3802,9 +3909,9 @@ class GestureBitmapViewTest {
             transformationParameters2.horizontalTranslation, 0.0
         )
 
-        // vertical scroll has been limited
+        // vertical scroll has been snapped to bottom border
         assertEquals(
-            transformationParameters1.verticalTranslation,
+            -view.height.toDouble(),
             transformationParameters2.verticalTranslation, 0.0
         )
     }
@@ -3831,14 +3938,6 @@ class GestureBitmapViewTest {
         )
         view.layout(0, 0, 1080, 1920)
 
-        val scaleGestureDetector: ScaleGestureDetector? =
-            view.getPrivateProperty("scaleGestureDetector")
-        assertNotNull(scaleGestureDetector)
-
-        val scaleGestureDetectorSpy = spyk(scaleGestureDetector as ScaleGestureDetector)
-        view.setPrivateProperty("scaleGestureDetector", scaleGestureDetectorSpy)
-        every { scaleGestureDetectorSpy.isInProgress }.returns(false)
-
         val event2 = mockk<MotionEvent>()
         every { event2.pointerCount }.returns(2)
 
@@ -3855,7 +3954,7 @@ class GestureBitmapViewTest {
 
         // set a scale larger than one after setting bitmap (otherwise scale is reset)
         transformationParameters1.scale = 2.0
-        transformationParameters1.horizontalTranslation = 0.0
+        transformationParameters1.horizontalTranslation = -0.1
         transformationParameters1.verticalTranslation = (-view.height / 2).toDouble()
         view.transformationParameters = transformationParameters1
 
@@ -3866,6 +3965,9 @@ class GestureBitmapViewTest {
         val leftBoundReachedListener =
             mockk<GestureBitmapView.OnLeftBoundReachedListener>(relaxUnitFun = true)
         view.leftBoundReachedListener = leftBoundReachedListener
+
+        // update start displayed rectangle coordinates
+        view.callPrivateFunc("updateStartDisplayedRectangleCoordinates")
 
         // execute fling
         assertTrue(gestureDetectorListener.onFling(event2, event2, 1.0f, 1.0f))
@@ -3885,11 +3987,8 @@ class GestureBitmapViewTest {
             transformationParameters2.rotationAngle,
             0.0
         )
-        // horizontal scroll has been limited
-        assertEquals(
-            transformationParameters1.horizontalTranslation,
-            transformationParameters2.horizontalTranslation, 0.0
-        )
+        // horizontal scroll has been snapped to left border
+        assertEquals(0.0, transformationParameters2.horizontalTranslation, 0.0)
 
         // vertical translation is modified during scroll
         assertNotEquals(
@@ -3920,14 +4019,6 @@ class GestureBitmapViewTest {
         )
         view.layout(0, 0, 1080, 1920)
 
-        val scaleGestureDetector: ScaleGestureDetector? =
-            view.getPrivateProperty("scaleGestureDetector")
-        assertNotNull(scaleGestureDetector)
-
-        val scaleGestureDetectorSpy = spyk(scaleGestureDetector as ScaleGestureDetector)
-        view.setPrivateProperty("scaleGestureDetector", scaleGestureDetectorSpy)
-        every { scaleGestureDetectorSpy.isInProgress }.returns(false)
-
         val event2 = mockk<MotionEvent>()
         every { event2.pointerCount }.returns(2)
 
@@ -3944,7 +4035,7 @@ class GestureBitmapViewTest {
 
         // set a scale larger than one after setting bitmap (otherwise scale is reset)
         transformationParameters1.scale = 2.0
-        transformationParameters1.horizontalTranslation = -view.width.toDouble()
+        transformationParameters1.horizontalTranslation = -view.width.toDouble() + 0.1
         transformationParameters1.verticalTranslation = 0.0
         view.transformationParameters = transformationParameters1
 
@@ -3955,6 +4046,9 @@ class GestureBitmapViewTest {
         val rightBoundReachedListener =
             mockk<GestureBitmapView.OnRightBoundReachedListener>(relaxUnitFun = true)
         view.rightBoundReachedListener = rightBoundReachedListener
+
+        // update start displayed rectangle coordinates
+        view.callPrivateFunc("updateStartDisplayedRectangleCoordinates")
 
         // execute fling
         assertTrue(gestureDetectorListener.onFling(event2, event2, -1.0f, -1.0f))
@@ -3974,9 +4068,9 @@ class GestureBitmapViewTest {
             transformationParameters2.rotationAngle,
             0.0
         )
-        // horizontal scroll has been limited
+        // horizontal scroll has been snapped to right border
         assertEquals(
-            transformationParameters1.horizontalTranslation,
+            -view.width.toDouble(),
             transformationParameters2.horizontalTranslation, 0.0
         )
 
@@ -4137,80 +4231,7 @@ class GestureBitmapViewTest {
     }
 
     @Test
-    fun gestureScroll_whenNonExclusiveAndScaleGestureDetectorIsInProgress_makesNoAction() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val view = GestureBitmapView(context)
-
-        val gestureDetector: GestureDetector? = view.getPrivateProperty("gestureDetector")
-        val gestureDetectorListener: GestureDetector.SimpleOnGestureListener? =
-            gestureDetector?.getPrivateProperty("mListener")
-
-        require(gestureDetectorListener != null)
-
-        view.scrollEnabled = true
-        view.twoFingerScrollEnabled = false
-        view.exclusiveTwoFingerScrollEnabled = false
-
-        val scaleGestureDetector: ScaleGestureDetector? =
-            view.getPrivateProperty("scaleGestureDetector")
-        assertNotNull(scaleGestureDetector)
-
-        val scaleGestureDetectorSpy = spyk(scaleGestureDetector as ScaleGestureDetector)
-        view.setPrivateProperty("scaleGestureDetector", scaleGestureDetectorSpy)
-        every { scaleGestureDetectorSpy.isInProgress }.returns(true)
-
-        val event1 = mockk<MotionEvent>()
-        every { event1.pointerCount }.returns(1)
-
-        val transformationParameters = view.transformationParameters
-        assertEquals(0.0, transformationParameters.horizontalTranslation, 0.0)
-        assertEquals(0.0, transformationParameters.verticalTranslation, 0.0)
-
-        // execute scroll
-        assertFalse(gestureDetectorListener.onScroll(event1, event1, 1.0f, 1.0f))
-
-        // check that transformation has not changed
-        assertEquals(transformationParameters, view.transformationParameters)
-    }
-
-    @Test
-    fun gestureScroll_whenScaleGestureDetectorIsInProgress_makesNoAction() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val view = GestureBitmapView(context)
-
-        val gestureDetector: GestureDetector? = view.getPrivateProperty("gestureDetector")
-        val gestureDetectorListener: GestureDetector.SimpleOnGestureListener? =
-            gestureDetector?.getPrivateProperty("mListener")
-
-        require(gestureDetectorListener != null)
-
-        view.scrollEnabled = true
-        view.twoFingerScrollEnabled = false
-
-        val scaleGestureDetector: ScaleGestureDetector? =
-            view.getPrivateProperty("scaleGestureDetector")
-        assertNotNull(scaleGestureDetector)
-
-        val scaleGestureDetectorSpy = spyk(scaleGestureDetector as ScaleGestureDetector)
-        view.setPrivateProperty("scaleGestureDetector", scaleGestureDetectorSpy)
-        every { scaleGestureDetectorSpy.isInProgress }.returns(true)
-
-        val event1 = mockk<MotionEvent>()
-        every { event1.pointerCount }.returns(1)
-
-        val transformationParameters = view.transformationParameters
-        assertEquals(0.0, transformationParameters.horizontalTranslation, 0.0)
-        assertEquals(0.0, transformationParameters.verticalTranslation, 0.0)
-
-        // execute scroll
-        assertFalse(gestureDetectorListener.onScroll(event1, event1, 1.0f, 1.0f))
-
-        // check that transformation has not changed
-        assertEquals(transformationParameters, view.transformationParameters)
-    }
-
-    @Test
-    fun gestureScroll_whenScaleGestureDetectorIsNotInProgressAndUnitScale_makesNoAction() {
+    fun gestureScroll_whenNonExclusiveAndUnitScale_makesScroll() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val view = GestureBitmapView(context)
 
@@ -4223,29 +4244,36 @@ class GestureBitmapViewTest {
         view.scrollEnabled = true
         view.twoFingerScrollEnabled = true
 
-        val scaleGestureDetector: ScaleGestureDetector? =
-            view.getPrivateProperty("scaleGestureDetector")
-        assertNotNull(scaleGestureDetector)
-
-        val scaleGestureDetectorSpy = spyk(scaleGestureDetector as ScaleGestureDetector)
-        view.setPrivateProperty("scaleGestureDetector", scaleGestureDetectorSpy)
-        every { scaleGestureDetectorSpy.isInProgress }.returns(false)
-
         val event2 = mockk<MotionEvent>()
         every { event2.pointerCount }.returns(2)
 
-        val transformationParameters = view.transformationParameters
-        assertEquals(1.0, transformationParameters.scale, 0.0)
+        val transformationParameters1 = view.transformationParameters
+        assertEquals(1.0, transformationParameters1.scale, 0.0)
 
         // execute scroll
-        assertFalse(gestureDetectorListener.onScroll(event2, event2, 1.0f, 1.0f))
+        assertTrue(gestureDetectorListener.onScroll(event2, event2, 1.0f, 1.0f))
 
-        // check that transformation has not changed
-        assertEquals(transformationParameters, view.transformationParameters)
+        // check that transformation has changed
+        val transformationParameters2 = view.transformationParameters
+        assertNotEquals(transformationParameters1, transformationParameters2)
+        assertEquals(transformationParameters1.scale, transformationParameters2.scale, 0.0)
+        assertEquals(
+            transformationParameters1.rotationAngle,
+            transformationParameters2.rotationAngle,
+            0.0
+        )
+        assertNotEquals(
+            transformationParameters1.horizontalTranslation,
+            transformationParameters2.horizontalTranslation, 0.0
+        )
+        assertNotEquals(
+            transformationParameters1.verticalTranslation,
+            transformationParameters2.verticalTranslation, 0.0
+        )
     }
 
     @Test
-    fun gestureScroll_whenScaleGestureDetectorIsNotInProgressAndGreaterThan1Scale_makesScroll() {
+    fun gestureScroll_whenNonExclusiveAndGreaterThan1Scale_makesScroll() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val view = GestureBitmapView(context)
 
@@ -4263,14 +4291,6 @@ class GestureBitmapViewTest {
             View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY)
         )
         view.layout(0, 0, 1080, 1920)
-
-        val scaleGestureDetector: ScaleGestureDetector? =
-            view.getPrivateProperty("scaleGestureDetector")
-        assertNotNull(scaleGestureDetector)
-
-        val scaleGestureDetectorSpy = spyk(scaleGestureDetector as ScaleGestureDetector)
-        view.setPrivateProperty("scaleGestureDetector", scaleGestureDetectorSpy)
-        every { scaleGestureDetectorSpy.isInProgress }.returns(false)
 
         val event2 = mockk<MotionEvent>()
         every { event2.pointerCount }.returns(2)
@@ -4499,7 +4519,6 @@ class GestureBitmapViewTest {
         private const val BASE_MATRIX_KEY = "baseMatrix"
         private const val PARAMS_MATRIX_KEY = "paramsMatrix"
         private const val DISPLAY_MATRIX_KEY = "displayMatrix"
-        private const val INVERSE_DISPLAY_MATRIX_KEY = "inverseDisplayMatrix"
         private const val ROTATION_ENABLED_KEY = "rotationEnabled"
         private const val SCALE_ENABLED_KEY = "scaleEnabled"
         private const val SCROLL_ENABLED_KEY = "scrollEnabled"
@@ -4511,7 +4530,12 @@ class GestureBitmapViewTest {
         private const val MIN_SCALE_KEY = "minScale"
         private const val MAX_SCALE_KEY = "maxScale"
         private const val SCALE_FACTOR_JUMP_KEY = "scaleFactorJump"
-        private const val SCALE_MARGIN_KEY = "scaleMargin"
+        private const val MIN_SCALE_MARGIN_KEY = "minScaleMargin"
+        private const val MAX_SCALE_MARGIN_KEY = "maxScaleMargin"
+        private const val LEFT_SCROLL_MARGIN_KEY = "leftScrollMargin"
+        private const val TOP_SCROLL_MARGIN_KEY = "topScrollMargin"
+        private const val RIGHT_SCROLL_MARGIN_KEY = "rightScrollMargin"
+        private const val BOTTOM_SCROLL_MARGIN_KEY = "bottomScrollMargin"
 
         private fun getTransformationParameters(): MetricTransformationParameters {
             val randomizer = UniformRandomizer()

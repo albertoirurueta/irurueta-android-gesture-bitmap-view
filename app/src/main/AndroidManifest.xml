@@ -11,7 +11,8 @@
         android:theme="@style/Theme.App">
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:theme="@style/Theme.App.FullScreen">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

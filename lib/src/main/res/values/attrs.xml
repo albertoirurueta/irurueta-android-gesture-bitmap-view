@@ -23,6 +23,11 @@
         <attr name="minScale" format="float"/>
         <attr name="maxScale" format="float"/>
         <attr name="scaleFactorJump" format="float"/>
-        <attr name="scaleMargin" format="float"/>
+        <attr name="minScaleMargin" format="float"/>
+        <attr name="maxScaleMargin" format="float"/>
+        <attr name="leftScrollMargin" format="float"/>
+        <attr name="topScrollMargin" format="float"/>
+        <attr name="rightScrollMargin" format="float"/>
+        <attr name="bottomScrollMargin" format="float"/>
     </declare-styleable>
 </resources>

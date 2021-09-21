@@ -930,7 +930,12 @@ class GestureBitmapViewTest {
         view.minScale = 0.5f
         view.maxScale = 100.0f
         view.scaleFactorJump = 1.0f
-        view.scaleMargin = 0.2f
+        view.minScaleMargin = 0.2f
+        view.maxScaleMargin = 2.0f
+        view.leftScrollMargin = 50.0f
+        view.topScrollMargin = 51.0f
+        view.rightScrollMargin = 52.0f
+        view.bottomScrollMargin = 53.0f
 
         // save state
         val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -974,7 +979,12 @@ class GestureBitmapViewTest {
         assertEquals(0.5f, view.minScale, 0.0f)
         assertEquals(100.0f, view.maxScale, 0.0f)
         assertEquals(1.0f, view.scaleFactorJump, 0.0f)
-        assertEquals(0.2f, view.scaleMargin, 0.0f)
+        assertEquals(0.2f, view.minScaleMargin, 0.0f)
+        assertEquals(2.0f, view.maxScaleMargin, 0.0f)
+        assertEquals(50.0f, view.leftScrollMargin, 0.0f)
+        assertEquals(51.0f, view.topScrollMargin, 0.0f)
+        assertEquals(52.0f, view.rightScrollMargin, 0.0f)
+        assertEquals(53.0f, view.bottomScrollMargin, 0.0f)
     }
 
     @Test
@@ -998,7 +1008,12 @@ class GestureBitmapViewTest {
         assertEquals(1.0f, view.minScale, 0.0f)
         assertEquals(10.0f, view.maxScale, 0.0f)
         assertEquals(3.0f, view.scaleFactorJump, 0.0f)
-        assertEquals(0.1f, view.scaleMargin, 0.0f)
+        assertEquals(0.1f, view.minScaleMargin, 0.0f)
+        assertEquals(1.0f, view.maxScaleMargin, 0.0f)
+        assertEquals(100.0f, view.leftScrollMargin, 0.0f)
+        assertEquals(100.0f, view.topScrollMargin, 0.0f)
+        assertEquals(100.0f, view.rightScrollMargin, 0.0f)
+        assertEquals(100.0f, view.bottomScrollMargin, 0.0f)
 
         val maxTimes = ((view.maxScale - view.minScale) / view.scaleFactorJump).toInt()
         for (i in 1..maxTimes) {
@@ -1011,11 +1026,11 @@ class GestureBitmapViewTest {
 
             InstrumentationTestHelper.doubleTap(view)
 
-            waitOnCondition { doubleTap == 0 }
+            waitOnCondition({ doubleTap == 0 })
 
             assertEquals(1, doubleTap)
 
-            waitOnCondition { scaleAnimationCompleted == 0 }
+            waitOnCondition({ scaleAnimationCompleted == 0 })
 
             assertEquals(1, scaleAnimationCompleted)
         }
@@ -1032,20 +1047,20 @@ class GestureBitmapViewTest {
 
         InstrumentationTestHelper.doubleTap(view)
 
-        waitOnCondition { doubleTap == 0 }
+        waitOnCondition({ doubleTap == 0 })
 
         assertEquals(1, doubleTap)
 
-        waitOnCondition { scaleAnimationCompleted == 0 }
+        waitOnCondition({ scaleAnimationCompleted == 0 })
 
         assertEquals(1, scaleAnimationCompleted)
 
-        waitOnCondition { rotationAndTranslateAnimationCompleted == 0 }
+        waitOnCondition({ rotationAndTranslateAnimationCompleted == 0 })
 
         assertEquals(1, rotationAndTranslateAnimationCompleted)
     }
 
-    @RequiresEmulator
+    //@RequiresEmulator
     @Test
     fun scrollAndFlingGestures_whenReachesBounds_notifies() {
         val view = this.view ?: return fail()
@@ -1067,7 +1082,12 @@ class GestureBitmapViewTest {
         assertEquals(1.0f, view.minScale, 0.0f)
         assertEquals(10.0f, view.maxScale, 0.0f)
         assertEquals(3.0f, view.scaleFactorJump, 0.0f)
-        assertEquals(0.1f, view.scaleMargin, 0.0f)
+        assertEquals(0.1f, view.minScaleMargin, 0.0f)
+        assertEquals(1.0f, view.maxScaleMargin, 0.0f)
+        assertEquals(100.0f, view.leftScrollMargin, 0.0f)
+        assertEquals(100.0f, view.topScrollMargin, 0.0f)
+        assertEquals(100.0f, view.rightScrollMargin, 0.0f)
+        assertEquals(100.0f, view.bottomScrollMargin, 0.0f)
 
         // make double tap to increase zoom
         reset()
@@ -1076,11 +1096,11 @@ class GestureBitmapViewTest {
 
         InstrumentationTestHelper.doubleTap(view)
 
-        waitOnCondition { doubleTap == 0 }
+        waitOnCondition({ doubleTap == 0 })
 
         assertEquals(1, doubleTap)
 
-        waitOnCondition { scaleAnimationCompleted == 0 }
+        waitOnCondition({ scaleAnimationCompleted == 0 })
 
         assertEquals(1, scaleAnimationCompleted)
 
@@ -1097,7 +1117,6 @@ class GestureBitmapViewTest {
         val viewCenterX = viewLeft + viewWidth / 2
         val viewCenterY = viewTop + viewHeight / 2
 
-        val viewRight = viewLeft + viewWidth
         val viewBottom = viewTop + viewHeight
 
         val timesH = ceil(rec.width() / viewWidth).toInt()
@@ -1113,27 +1132,27 @@ class GestureBitmapViewTest {
         for (t in 0 until timesV) {
             InstrumentationTestHelper.drag(
                 viewCenterX,
-                viewBottom - 1,
+                viewCenterY,
                 viewCenterX,
                 viewTop
             )
         }
 
-        waitOnCondition { bottomBoundReached == 0 }
+        waitOnCondition({ bottomBoundReached == 0 })
 
         assertTrue(bottomBoundReached > 0)
 
         // drag until right border
         for (t in 0 until timesH) {
             InstrumentationTestHelper.drag(
-                viewRight - 1,
+                viewCenterX,
                 viewCenterY,
                 viewLeft,
                 viewCenterY
             )
         }
 
-        waitOnCondition { rightBoundReached == 0 }
+        waitOnCondition({ rightBoundReached == 0 })
 
         assertTrue(rightBoundReached > 0)
 
@@ -1141,27 +1160,29 @@ class GestureBitmapViewTest {
         for (t in 0 until timesV) {
             InstrumentationTestHelper.drag(
                 viewCenterX,
-                viewTop,
+                viewCenterY,
                 viewCenterX,
-                viewBottom - 1
+                viewBottom
             )
         }
 
-        waitOnCondition { topBoundReached == 0 }
+        waitOnCondition({ topBoundReached == 0 })
 
         assertTrue(topBoundReached > 0)
 
         // drag until left border
-        for (t in 0 until timesH) {
+        val fromX = viewCenterX - viewWidth / 3
+        val toX = viewCenterX + viewWidth / 3
+        for (t in 0 until timesH + 1) {
             InstrumentationTestHelper.drag(
-                viewLeft,
+                fromX,
                 viewCenterY,
-                viewRight - 1,
+                toX,
                 viewCenterY
             )
         }
 
-        waitOnCondition { leftBoundReached == 0 }
+        waitOnCondition({ leftBoundReached == 0 }, 2 * MAX_RETRIES, 2 * TIMEOUT)
 
         assertTrue(leftBoundReached > 0)
 
@@ -1197,21 +1218,17 @@ class GestureBitmapViewTest {
 
         val verticalPosition = viewCenterY - distance
         val startX1 = viewCenterX - distance
-        val startY1 = verticalPosition
         val startX2 = viewCenterX + distance
-        val startY2 = verticalPosition
         val endX1 = viewCenterX - 2 * distance
-        val endY1 = verticalPosition
         val endX2 = viewCenterX + 2 * distance
-        val endY2 = verticalPosition
 
         // check initial scale
         assertEquals(1.0, view.transformationParameters.scale, 0.0)
 
         // zoom in
         InstrumentationTestHelper.pinch(
-            startX1, startY1, startX2, startY2,
-            endX1, endY1, endX2, endY2
+            startX1, verticalPosition, startX2, verticalPosition,
+            endX1, verticalPosition, endX2, verticalPosition
         )
 
         // check scale after gesture
@@ -1219,17 +1236,17 @@ class GestureBitmapViewTest {
 
         // zoom out
         InstrumentationTestHelper.pinch(
-            endX1, endY1, endX2, endY2,
-            startX1, startY1, startX2, startY2
+            endX1, verticalPosition, endX2, verticalPosition,
+            startX1, verticalPosition, startX2, verticalPosition
         )
 
         // repeat zoom out to reach minimum scale
         InstrumentationTestHelper.pinch(
-            endX1, endY1, endX2, endY2,
-            startX1, startY1, startX2, startY2
+            endX1, verticalPosition, endX2, verticalPosition,
+            startX1, verticalPosition, startX2, verticalPosition
         )
 
-        waitOnCondition { scaleAnimationCompleted == 0 }
+        waitOnCondition({ scaleAnimationCompleted == 0 })
 
         // check
         assertTrue(scaleAnimationCompleted > 0)
@@ -1298,11 +1315,15 @@ class GestureBitmapViewTest {
         doubleTap = 0
     }
 
-    private fun waitOnCondition(condition: () -> Boolean) {
+    private fun waitOnCondition(
+        condition: () -> Boolean,
+        maxRetries: Int = MAX_RETRIES,
+        timeout: Long = TIMEOUT
+    ) {
         synchronized(lock) {
             var count = 0
-            while (condition() && count < MAX_RETRIES) {
-                lock.wait(TIMEOUT)
+            while (condition() && count < maxRetries) {
+                lock.wait(timeout)
                 count++
             }
         }
