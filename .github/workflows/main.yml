@@ -46,8 +46,10 @@ jobs:
         if: always()
         with:
           files: |
-            test-results/**/*.xml
-            androidTest-results/**/*.xml
+            app/build/test-results/**/*.xml
+            app/build/outputs/androidTest-results/**/*.xml
+            lib/build/test-results/**/*.xml
+            lib/build/outputs/androidTest-results/**/*.xml
 
       # Runs a single command using the runners shell
       - name: Run a one-line script
