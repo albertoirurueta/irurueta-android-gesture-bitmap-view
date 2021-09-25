@@ -35,11 +35,13 @@ jobs:
 
       - name: run tests
         uses: reactivecircus/android-emulator-runner@v2
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
           api-level: 29
           target: google_apis
           arch: x86_64
-          script: ./gradlew test connectedAndroidTest lint dokkaHtml
+          script: ./gradlew test connectedAndroidTest lint dokkaHtml sonarqube
 
       - name: Publish Test Results
         uses: EnricoMi/publish-unit-test-result-action/composite@v1
