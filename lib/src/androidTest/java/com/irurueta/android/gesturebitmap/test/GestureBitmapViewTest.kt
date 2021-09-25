@@ -4,6 +4,7 @@ import android.content.Intent
 import android.graphics.Matrix
 import android.os.Bundle
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.filters.RequiresDevice
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.ActivityTestRule
 import com.irurueta.android.gesturebitmap.*
@@ -20,7 +21,7 @@ class GestureBitmapViewTest {
 
     @get:Rule
     val activityRule = ActivityTestRule(GestureBitmapViewActivity::class.java, true)
-    
+
     private var activity: GestureBitmapViewActivity? = null
     private var view: GestureBitmapView? = null
 
@@ -984,6 +985,7 @@ class GestureBitmapViewTest {
         assertEquals(53.0f, view.bottomScrollMargin, 0.0f)
     }
 
+    @RequiresDevice
     @Test
     fun doubleTapGesture_modifiesScaleAndNotifies() {
         val view = this.view ?: return fail()
@@ -1057,6 +1059,7 @@ class GestureBitmapViewTest {
         assertEquals(1, rotationAndTranslateAnimationCompleted)
     }
 
+    @RequiresDevice
     @Test
     fun scrollAndFlingGestures_whenReachesBounds_notifies() {
         val view = this.view ?: return fail()
