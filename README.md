@@ -2,6 +2,8 @@
 A touch gesture capable Android view to display bitmaps and perform scaling, translation and 
 rotation on the bitmap
 
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=albertoirurueta_irurueta-android-gesture-bitmap-view&metric=alert_status)](https://sonarcloud.io/dashboard?id=albertoirurueta_irurueta-android-gesture-bitmap-view)
+
 To execute all unit tests, execute:
 ```
 gradlew test
