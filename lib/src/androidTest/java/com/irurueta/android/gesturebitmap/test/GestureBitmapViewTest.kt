@@ -987,6 +987,7 @@ class GestureBitmapViewTest {
         assertEquals(53.0f, view.bottomScrollMargin, 0.0f)
     }
 
+    @RequiresEmulator
     @Test
     fun doubleTapGesture_modifiesScaleAndNotifies() {
         val view = this.view ?: return fail()
@@ -1060,7 +1061,7 @@ class GestureBitmapViewTest {
         assertEquals(1, rotationAndTranslateAnimationCompleted)
     }
 
-    //@RequiresEmulator
+    @RequiresEmulator
     @Test
     fun scrollAndFlingGestures_whenReachesBounds_notifies() {
         val view = this.view ?: return fail()
