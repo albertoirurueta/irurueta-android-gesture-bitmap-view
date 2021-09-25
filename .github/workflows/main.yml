@@ -41,6 +41,14 @@ jobs:
           arch: x86_64
           script: ./gradlew test connectedAndroidTest lint dokkaHtml
 
+      - name: Publish Test Results
+        uses: EnricoMi/publish-unit-test-result-action/composite@v1
+        if: always()
+        with:
+          files: |
+            test-results/**/*.xml
+            androidTest-results/**/*.xml
+
       # Runs a single command using the runners shell
       - name: Run a one-line script
         run: echo Build succeeded
