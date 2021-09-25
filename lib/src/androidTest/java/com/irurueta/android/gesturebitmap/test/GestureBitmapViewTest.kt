@@ -20,10 +20,7 @@ class GestureBitmapViewTest {
 
     @get:Rule
     val activityRule = ActivityTestRule(GestureBitmapViewActivity::class.java, true)
-
-    @get:Rule
-    var conditionalIgnoreRule = ConditionalIgnoreRule()
-
+    
     private var activity: GestureBitmapViewActivity? = null
     private var view: GestureBitmapView? = null
 
@@ -987,7 +984,6 @@ class GestureBitmapViewTest {
         assertEquals(53.0f, view.bottomScrollMargin, 0.0f)
     }
 
-    @RequiresEmulator
     @Test
     fun doubleTapGesture_modifiesScaleAndNotifies() {
         val view = this.view ?: return fail()
@@ -1061,7 +1057,6 @@ class GestureBitmapViewTest {
         assertEquals(1, rotationAndTranslateAnimationCompleted)
     }
 
-    @RequiresEmulator
     @Test
     fun scrollAndFlingGestures_whenReachesBounds_notifies() {
         val view = this.view ?: return fail()
@@ -1333,6 +1328,6 @@ class GestureBitmapViewTest {
     private companion object {
         private const val ABSOLUTE_ERROR = 1e-4
         private const val MAX_RETRIES = 2
-        private const val TIMEOUT = 2000L
+        private const val TIMEOUT = 20000L
     }
 }
