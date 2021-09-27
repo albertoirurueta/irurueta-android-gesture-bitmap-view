@@ -50,7 +50,10 @@ jobs:
             lib/build/test-results/**/*.xml
             lib/build/outputs/androidTest-results/**/*.xml
       - name: Convert unit tests coverage results
-        run: java -jar jacoco-0.8.7/lib/jacococli.jar report lib/build/jacoco/testReleaseUnitTest.exec --classfiles lib/build/tmp/kotlin-classes/release --html lib/build/reports/coverage/test --xml lib/build/reports/coverage/test/report.xml
+        run: |
+          mkdir lib/build/reports/coverage/test
+          java -jar jacoco-0.8.7/lib/jacococli.jar report lib/build/jacoco/testReleaseUnitTest.exec --classfiles lib/build/tmp/kotlin-classes/release --html lib/build/reports/coverage/test
+          java -jar jacoco-0.8.7/lib/jacococli.jar report lib/build/jacoco/testReleaseUnitTest.exec --classfiles lib/build/tmp/kotlin-classes/release --xml lib/build/reports/coverage/test/report.xml
       - name: Send to Sonarqube
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
