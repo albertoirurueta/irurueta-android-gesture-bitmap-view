@@ -35,14 +35,11 @@ jobs:
 
       - name: run tests
         uses: reactivecircus/android-emulator-runner@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
           api-level: 29
           target: google_apis
           arch: x86_64
-          script: ./gradlew testDebugUnitTest connectedDebugAndroidTest testDebugUnitTestCoverage lint dokkaHtml sonarqube
+          script: ./gradlew test connectedAndroidTest lint dokkaHtml
       - name: publish test results
         uses: EnricoMi/publish-unit-test-result-action/composite@v1
         if: always()
@@ -52,4 +49,12 @@ jobs:
             app/build/outputs/androidTest-results/**/*.xml
             lib/build/test-results/**/*.xml
             lib/build/outputs/androidTest-results/**/*.xml
+      - name: Convert unit tests coverage results
+        run: java -jar jacoco-0.8.7/lib/jacococli.jar report lib/build/jacoco/testReleaseUnitTest.exec --classfiles lib/build/tmp/kotlin-classes/release --html lib/build/reports/coverage/test --xml lib/build/reports/coverage/test/report.xml
+      - name: Send to Sonarqube
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: ./gradlew sonarqube
+
 

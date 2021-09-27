@@ -39,3 +39,7 @@ To execute sonarqube, run:
 gradlew sonarqube
 ```
 
+To convert exec files to xml and html reports:
+```
+java -jar jacoco-0.8.7/lib/jacococli.jar report lib/build/jacoco/testReleaseUnitTest.exec --classfiles lib/build/tmp/kotlin-classes/release --html lib/build/reports/coverage/test --xml lib/build/reports/coverage/test/report.xml
+```
