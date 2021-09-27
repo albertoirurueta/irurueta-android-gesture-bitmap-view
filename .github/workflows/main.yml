@@ -26,21 +26,21 @@ jobs:
       - name: checkout
         uses: actions/checkout@v2
 
-      - name: setup java
+      - name: Setup java
         uses: actions/setup-java@v2
         with:
           distribution: 'temurin' # See 'Supported distributions' for available options
           java-version: '11'
           script: java --version
 
-      - name: run tests
+      - name: Run tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 29
           target: google_apis
           arch: x86_64
           script: ./gradlew test connectedAndroidTest lint dokkaHtml
-      - name: publish test results
+      - name: Publish test results
         uses: EnricoMi/publish-unit-test-result-action/composite@v1
         if: always()
         with:
@@ -59,5 +59,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: ./gradlew sonarqube
+      - name: Deploy to GitHub Pages
+        if: success()
+        uses: crazy-max/ghaction-github-pages@v2
+        with:
+          target_branch: gh-pages
+          build_dir: dokka/html
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 
 

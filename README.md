@@ -5,6 +5,8 @@ rotation on the bitmap
 [![Build Status](https://github.com/albertoirurueta/irurueta-android-gesture-bitmap-view/actions/workflows/main.yml/badge.svg)](https://github.com/albertoirurueta/irurueta-android-gesture-bitmap-view/actions)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=albertoirurueta_irurueta-android-gesture-bitmap-view&metric=alert_status)](https://sonarcloud.io/dashboard?id=albertoirurueta_irurueta-android-gesture-bitmap-view)
 
+[API Documentation](http://albertoirurueta.github.io/irurueta-android-gesture-bitmap-view)
+
 To execute all unit tests, execute:
 ```
 gradlew test
