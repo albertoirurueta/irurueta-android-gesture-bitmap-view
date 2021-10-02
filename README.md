@@ -46,4 +46,6 @@ To convert exec files to xml and html reports:
 java -jar jacoco-0.8.7/lib/jacococli.jar report lib/build/jacoco/testReleaseUnitTest.exec --classfiles lib/build/tmp/kotlin-classes/release --html lib/build/reports/coverage/test --xml lib/build/reports/coverage/test/report.xml
 ```
 
-TODO: rename lib module an publish library aar to maven
+Github actions to release library in maven central has been configured following:
+[https://getstream.io/blog/publishing-libraries-to-mavencentral-2021/](https://getstream.io/blog/publishing-libraries-to-mavencentral-2021/)
+
