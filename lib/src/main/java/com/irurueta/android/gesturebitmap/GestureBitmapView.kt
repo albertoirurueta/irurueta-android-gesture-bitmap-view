@@ -552,7 +552,7 @@ class GestureBitmapView @JvmOverloads constructor(
         }
 
         if (action == MotionEvent.ACTION_UP) {
-            limitScale()
+            limitScaleAndTranslation()
         }
 
         return true
@@ -694,13 +694,29 @@ class GestureBitmapView @JvmOverloads constructor(
         startRectBottom = bitmapDisplayedRect.bottom
     }
 
+    private fun limitScaleAndTranslation() {
+        getTransformationParameters(paramsMatrix, parameters)
+        val currentScale = parameters.scale
+        if (currentScale < minScale || currentScale > maxScale) {
+            limitScale(currentScale)
+        } else {
+            val translateAnimator = this.translateAnimator
+            val scaleAnimator = this.scaleAnimator
+            if ((translateAnimator == null && scaleAnimator == null) ||
+                (translateAnimator != null && !translateAnimator.isRunning &&
+                        scaleAnimator != null && !scaleAnimator.isRunning)) {
+                smoothScrollBy(0.0f, 0.0f)
+            }
+        }
+    }
+
     /**
      * Called when a touch event finishes to ensure that scale is within proper
      * limit values.
+     *
+     * @param currentScale current scale used to display bitmap.
      */
-    private fun limitScale() {
-        getTransformationParameters(paramsMatrix, parameters)
-        val currentScale = parameters.scale
+    private fun limitScale(currentScale: Double) {
         if (currentScale < minScale || currentScale > maxScale) {
             val newScale = if (currentScale < minScale) minScale else maxScale
             val pivotX = (scaleGestureDetector?.focusX) ?: (width.toFloat() / 2.0f)
