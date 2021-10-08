@@ -14,6 +14,8 @@ rotation on the bitmap
 This library contains a view that can display a bitmap an handle touch gestures to translate, scale
 and rotate displayed bitmap.
 
+![Demo](docs/video.gif)
+
 ## Usage
 
 Add the following dependency to your project:
