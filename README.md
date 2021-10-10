@@ -4,7 +4,21 @@ A touch gesture capable Android view to display bitmaps and perform scaling, tra
 rotation on the bitmap
 
 [![Build Status](https://github.com/albertoirurueta/irurueta-android-gesture-bitmap-view/actions/workflows/main.yml/badge.svg)](https://github.com/albertoirurueta/irurueta-android-gesture-bitmap-view/actions)
-[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=albertoirurueta_irurueta-android-gesture-bitmap-view&metric=alert_status)](https://sonarcloud.io/dashboard?id=albertoirurueta_irurueta-android-gesture-bitmap-view)
+
+[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=albertoirurueta_irurueta-android-gesture-bitmap-view&metric=code_smells)](https://sonarcloud.io/dashboard?id=albertoirurueta_irurueta-android-gesture-bitmap-view)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=albertoirurueta_irurueta-android-gesture-bitmap-view&metric=coverage)](https://sonarcloud.io/dashboard?id=albertoirurueta_irurueta-android-gesture-bitmap-view)
+
+[![Duplicated lines](https://sonarcloud.io/api/project_badges/measure?project=albertoirurueta_irurueta-android-gesture-bitmap-view&metric=duplicated_lines_density)](https://sonarcloud.io/dashboard?id=albertoirurueta_irurueta-android-gesture-bitmap-view)
+[![Lines of code](https://sonarcloud.io/api/project_badges/measure?project=albertoirurueta_irurueta-android-gesture-bitmap-view&metric=ncloc)](https://sonarcloud.io/dashboard?id=albertoirurueta_irurueta-android-gesture-bitmap-view)
+
+[![Maintainability](https://sonarcloud.io/api/project_badges/measure?project=albertoirurueta_irurueta-android-gesture-bitmap-view&metric=sqale_rating)](https://sonarcloud.io/dashboard?id=albertoirurueta_irurueta-android-gesture-bitmap-view)
+[![Quality gate](https://sonarcloud.io/api/project_badges/measure?project=albertoirurueta_irurueta-android-gesture-bitmap-view&metric=alert_status)](https://sonarcloud.io/dashboard?id=albertoirurueta_irurueta-android-gesture-bitmap-view)
+[![Reliability](https://sonarcloud.io/api/project_badges/measure?project=albertoirurueta_irurueta-android-gesture-bitmap-view&metric=reliability_rating)](https://sonarcloud.io/dashboard?id=albertoirurueta_irurueta-android-gesture-bitmap-view)
+
+[![Security](https://sonarcloud.io/api/project_badges/measure?project=albertoirurueta_irurueta-android-gesture-bitmap-view&metric=security_rating)](https://sonarcloud.io/dashboard?id=albertoirurueta_irurueta-android-gesture-bitmap-view)
+[![Technical debt](https://sonarcloud.io/api/project_badges/measure?project=albertoirurueta_irurueta-android-gesture-bitmap-view&metric=sqale_index)](https://sonarcloud.io/dashboard?id=albertoirurueta_irurueta-android-gesture-bitmap-view)
+[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=albertoirurueta_irurueta-android-gesture-bitmap-view&metric=vulnerabilities)](https://sonarcloud.io/dashboard?id=albertoirurueta_irurueta-android-gesture-bitmap-view)
+
 [![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.irurueta/irurueta-android-gesture-bitmap-view/badge.svg)](https://search.maven.org/artifact/com.irurueta/irurueta-android-gesture-bitmap-view/1.0.0/aar)
 
 [API Documentation](http://albertoirurueta.github.io/irurueta-android-gesture-bitmap-view)
