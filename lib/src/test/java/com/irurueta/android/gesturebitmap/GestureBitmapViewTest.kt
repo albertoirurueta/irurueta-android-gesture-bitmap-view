@@ -9,11 +9,9 @@ import android.graphics.Matrix
 import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.os.Looper
+import android.os.Parcelable
 import android.util.AttributeSet
-import android.view.GestureDetector
-import android.view.MotionEvent
-import android.view.ScaleGestureDetector
-import android.view.View
+import android.view.*
 import androidx.core.graphics.drawable.toBitmap
 import androidx.test.core.app.ApplicationProvider
 import com.irurueta.statistics.UniformRandomizer
@@ -1465,7 +1463,7 @@ class GestureBitmapViewTest {
         assertNotNull(displayRect)
 
         // set second bitmap as null
-        view.setBitmap(null)
+        view.setBitmap(null, true)
 
         // check
         assertNull(view.bitmap)
@@ -2686,7 +2684,7 @@ class GestureBitmapViewTest {
     }
 
     @Test
-    fun onRestoreInstanceState_setsExpectedValues() {
+    fun onRestoreInstanceState_whenViewState_setsExpectedValues() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val view = GestureBitmapView(context)
 
@@ -2773,6 +2771,77 @@ class GestureBitmapViewTest {
         assertEquals(102.0f, view.topScrollMargin, 0.0f)
         assertEquals(103.0f, view.rightScrollMargin, 0.0f)
         assertEquals(104.0f, view.bottomScrollMargin, 0.0f)
+    }
+
+    @Test
+    fun onRestoreInstanceState_whenNoViewState_makesNoAction() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val view = GestureBitmapView(context)
+
+        // check initial values
+        val identity = Matrix()
+        assertEquals(identity, view.baseTransformationMatrix)
+        assertEquals(identity, view.transformationMatrix)
+        assertEquals(identity, view.displayTransformationMatrix)
+        assertTrue(view.rotationEnabled)
+        assertTrue(view.scaleEnabled)
+        assertTrue(view.scrollEnabled)
+        assertTrue(view.twoFingerScrollEnabled)
+        assertFalse(view.exclusiveTwoFingerScrollEnabled)
+        assertTrue(view.doubleTapEnabled)
+        assertEquals(GestureBitmapView.DisplayType.FIT_X_CENTER, view.displayType)
+        assertEquals(1.0f, view.minScale, 0.0f)
+        assertEquals(10.0f, view.maxScale, 0.0f)
+        assertEquals(3.0f, view.scaleFactorJump, 0.0f)
+        assertEquals(0.1f, view.minScaleMargin, 0.0f)
+        assertEquals(1.0f, view.maxScaleMargin, 0.0f)
+        assertEquals(100.0f, view.leftScrollMargin, 0.0f)
+        assertEquals(100.0f, view.topScrollMargin, 0.0f)
+        assertEquals(100.0f, view.rightScrollMargin, 0.0f)
+        assertEquals(100.0f, view.bottomScrollMargin, 0.0f)
+
+        // prepare bundle to restore from
+        val parcelable = mockk<AbsSavedState>()
+
+        // restore state
+        view.callPrivateFunc("onRestoreInstanceState", parcelable)
+
+        // check initial values are preserved
+        assertEquals(identity, view.baseTransformationMatrix)
+        assertEquals(identity, view.transformationMatrix)
+        assertEquals(identity, view.displayTransformationMatrix)
+        assertTrue(view.rotationEnabled)
+        assertTrue(view.scaleEnabled)
+        assertTrue(view.scrollEnabled)
+        assertTrue(view.twoFingerScrollEnabled)
+        assertFalse(view.exclusiveTwoFingerScrollEnabled)
+        assertTrue(view.doubleTapEnabled)
+        assertEquals(GestureBitmapView.DisplayType.FIT_X_CENTER, view.displayType)
+        assertEquals(1.0f, view.minScale, 0.0f)
+        assertEquals(10.0f, view.maxScale, 0.0f)
+        assertEquals(3.0f, view.scaleFactorJump, 0.0f)
+        assertEquals(0.1f, view.minScaleMargin, 0.0f)
+        assertEquals(1.0f, view.maxScaleMargin, 0.0f)
+        assertEquals(100.0f, view.leftScrollMargin, 0.0f)
+        assertEquals(100.0f, view.topScrollMargin, 0.0f)
+        assertEquals(100.0f, view.rightScrollMargin, 0.0f)
+        assertEquals(100.0f, view.bottomScrollMargin, 0.0f)
+    }
+
+    fun onSizeChanged_whenNegativeSize_makesNoAction() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val view = spyk(GestureBitmapView(context))
+
+        view.callPrivateFunc("onSizeChanged", 0, 1920, 1080, 1921)
+
+        verify(exactly = 0) { view.bitmap }
+        verify(exactly = 0) { view.invalidate() }
+
+        view.callPrivateFunc("onSizeChanged", 1080, 0, 1081, 1921)
+
+        verify(exactly = 0) { view.bitmap }
+        verify(exactly = 0) { view.invalidate() }
+
     }
 
     @Test
