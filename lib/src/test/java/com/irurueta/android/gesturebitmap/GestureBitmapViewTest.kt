@@ -9,7 +9,6 @@ import android.graphics.Matrix
 import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.os.Looper
-import android.os.Parcelable
 import android.util.AttributeSet
 import android.view.*
 import androidx.core.graphics.drawable.toBitmap
