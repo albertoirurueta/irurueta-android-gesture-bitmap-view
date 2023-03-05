@@ -45,6 +45,13 @@ android {
             jvmArgs '-noverify'
         }
     }
+
+    namespace 'com.irurueta.android.gesturebitmap'
+
+    packagingOptions {
+        exclude 'META-INF/LICENSE-notice.md'
+        exclude 'META-INF/LICENSE.md'
+    }
 }
 
 jacoco {
