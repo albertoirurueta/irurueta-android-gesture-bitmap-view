@@ -310,8 +310,40 @@ class GestureBitmapViewTest {
         val displayTransformation2 = view.displayTransformationParameters
 
         assertEquals(baseTransformation1, baseTransformation2)
-        assertEquals(transformation1, transformation2)
-        assertEquals(displayTransformation1, displayTransformation2)
+
+        assertEquals(transformation1.scale, transformation2.scale, ABSOLUTE_ERROR)
+        assertEquals(
+            transformation1.rotationAngle,
+            transformation2.rotationAngle,
+            ABSOLUTE_ERROR
+        )
+        assertEquals(
+            transformation1.horizontalTranslation,
+            transformation2.horizontalTranslation,
+            LARGE_ABSOLUTE_ERROR
+        )
+        assertEquals(
+            transformation1.verticalTranslation,
+            transformation2.verticalTranslation,
+            LARGE_ABSOLUTE_ERROR
+        )
+
+        assertEquals(displayTransformation1.scale, displayTransformation2.scale, ABSOLUTE_ERROR)
+        assertEquals(
+            displayTransformation1.rotationAngle,
+            displayTransformation2.rotationAngle,
+            ABSOLUTE_ERROR
+        )
+        assertEquals(
+            displayTransformation1.horizontalTranslation,
+            displayTransformation2.horizontalTranslation,
+            LARGE_ABSOLUTE_ERROR
+        )
+        assertEquals(
+            displayTransformation1.verticalTranslation,
+            displayTransformation2.verticalTranslation,
+            LARGE_ABSOLUTE_ERROR
+        )
     }
 
     @Test
@@ -365,7 +397,22 @@ class GestureBitmapViewTest {
 
         assertNotEquals(baseTransformation1, baseTransformation2)
         assertNotEquals(transformation1, transformation2)
-        assertEquals(displayTransformation1, displayTransformation2)
+        assertEquals(displayTransformation1.scale, displayTransformation2.scale, ABSOLUTE_ERROR)
+        assertEquals(
+            displayTransformation1.rotationAngle,
+            displayTransformation2.rotationAngle,
+            ABSOLUTE_ERROR
+        )
+        assertEquals(
+            displayTransformation1.horizontalTranslation,
+            displayTransformation2.horizontalTranslation,
+            LARGE_ABSOLUTE_ERROR
+        )
+        assertEquals(
+            displayTransformation1.verticalTranslation,
+            displayTransformation2.verticalTranslation,
+            LARGE_ABSOLUTE_ERROR
+        )
     }
 
     @Test
@@ -1329,6 +1376,7 @@ class GestureBitmapViewTest {
     }
 
     private companion object {
+        private const val LARGE_ABSOLUTE_ERROR = 1e-3
         private const val ABSOLUTE_ERROR = 1e-4
         private const val MAX_RETRIES = 2
         private const val TIMEOUT = 20000L

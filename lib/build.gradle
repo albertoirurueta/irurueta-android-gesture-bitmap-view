@@ -12,7 +12,6 @@ android {
     defaultConfig {
         minSdk 21
         targetSdk 30
-        versionName "1.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles "consumer-rules.pro"
@@ -95,7 +94,7 @@ sonarqube {
 ext {
     // Provide your own coordinates here
     PUBLISH_GROUP_ID = 'com.irurueta'
-    PUBLISH_VERSION = '1.0.0'
+    PUBLISH_VERSION = '1.0.1'
     PUBLISH_ARTIFACT_ID = 'irurueta-android-gesture-bitmap-view'
 }
 
