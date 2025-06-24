@@ -1,3 +1,19 @@
+/*
+ * Copyright (C) 2025 Alberto Irurueta Carro (alberto@irurueta.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.irurueta.android.gesturebitmap
 
 import android.animation.ValueAnimator
@@ -9,13 +25,18 @@ import android.graphics.Matrix
 import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.os.Looper
+import android.os.SystemClock
 import android.util.AttributeSet
 import android.view.*
 import androidx.core.graphics.drawable.toBitmap
 import androidx.test.core.app.ApplicationProvider
 import com.irurueta.statistics.UniformRandomizer
 import io.mockk.*
+import io.mockk.impl.annotations.MockK
+import io.mockk.junit4.MockKRule
+import org.junit.After
 import org.junit.Assert.*
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -23,8 +44,21 @@ import org.robolectric.Shadows
 import org.robolectric.annotation.LooperMode
 import kotlin.random.Random
 
+@Suppress("KotlinConstantConditions")
 @RunWith(RobolectricTestRunner::class)
 class GestureBitmapViewTest {
+
+    @get:Rule
+    val mockkRule = MockKRule(this)
+
+    @MockK
+    private lateinit var bitmap: Bitmap
+
+    @After
+    fun afterTest() {
+        clearAllMocks()
+        unmockkAll()
+    }
 
     @Test
     fun constants_haveExpectedDefaultValues() {
@@ -107,7 +141,6 @@ class GestureBitmapViewTest {
         val typedArray = mockk<TypedArray>()
         every { typedArray.indexCount }.returns(0)
 
-        val bitmap = mockk<Bitmap>()
         every { bitmap.isRecycled }.returns(false)
         every { bitmap.width }.returns(640)
         every { bitmap.height }.returns(480)
@@ -539,7 +572,6 @@ class GestureBitmapViewTest {
         assertEquals(identity, view.baseTransformationMatrix)
 
         // set new value
-        val bitmap = mockk<Bitmap>()
         every { bitmap.isRecycled }.returns(false)
         every { bitmap.width }.returns(640)
         every { bitmap.height }.returns(480)
@@ -605,7 +637,6 @@ class GestureBitmapViewTest {
         assertEquals(GestureBitmapView.DisplayType.NONE, view.displayType)
 
         // set new value
-        val bitmap = mockk<Bitmap>()
         every { bitmap.isRecycled }.returns(false)
         every { bitmap.width }.returns(640)
         every { bitmap.height }.returns(480)
@@ -671,7 +702,6 @@ class GestureBitmapViewTest {
         assertEquals(GestureBitmapView.DisplayType.FIT_IF_BIGGER, view.displayType)
 
         // set new value
-        val bitmap = mockk<Bitmap>()
         every { bitmap.isRecycled }.returns(false)
         every { bitmap.width }.returns(1280)
         every { bitmap.height }.returns(960)
@@ -737,7 +767,6 @@ class GestureBitmapViewTest {
         assertEquals(GestureBitmapView.DisplayType.FIT_IF_BIGGER, view.displayType)
 
         // set new value
-        val bitmap = mockk<Bitmap>()
         every { bitmap.isRecycled }.returns(false)
         every { bitmap.width }.returns(640)
         every { bitmap.height }.returns(480)
@@ -803,7 +832,6 @@ class GestureBitmapViewTest {
         assertEquals(GestureBitmapView.DisplayType.FIT_X_TOP, view.displayType)
 
         // set new value
-        val bitmap = mockk<Bitmap>()
         every { bitmap.isRecycled }.returns(false)
         every { bitmap.width }.returns(640)
         every { bitmap.height }.returns(480)
@@ -869,7 +897,6 @@ class GestureBitmapViewTest {
         assertEquals(GestureBitmapView.DisplayType.FIT_X_BOTTOM, view.displayType)
 
         // set new value
-        val bitmap = mockk<Bitmap>()
         every { bitmap.isRecycled }.returns(false)
         every { bitmap.width }.returns(640)
         every { bitmap.height }.returns(480)
@@ -929,7 +956,6 @@ class GestureBitmapViewTest {
         assertEquals(identity, view.baseTransformationMatrix)
 
         // set new value
-        val bitmap = mockk<Bitmap>()
         every { bitmap.isRecycled }.returns(false)
         every { bitmap.width }.returns(640)
         every { bitmap.height }.returns(480)
@@ -995,7 +1021,6 @@ class GestureBitmapViewTest {
         assertEquals(GestureBitmapView.DisplayType.FIT_Y_LEFT, view.displayType)
 
         // set new value
-        val bitmap = mockk<Bitmap>()
         every { bitmap.isRecycled }.returns(false)
         every { bitmap.width }.returns(640)
         every { bitmap.height }.returns(480)
@@ -1061,7 +1086,6 @@ class GestureBitmapViewTest {
         assertEquals(GestureBitmapView.DisplayType.FIT_Y_RIGHT, view.displayType)
 
         // set new value
-        val bitmap = mockk<Bitmap>()
         every { bitmap.isRecycled }.returns(false)
         every { bitmap.width }.returns(640)
         every { bitmap.height }.returns(480)
@@ -1127,7 +1151,6 @@ class GestureBitmapViewTest {
         assertEquals(GestureBitmapView.DisplayType.FIT_Y_CENTER, view.displayType)
 
         // set new value
-        val bitmap = mockk<Bitmap>()
         every { bitmap.isRecycled }.returns(false)
         every { bitmap.width }.returns(640)
         every { bitmap.height }.returns(480)
@@ -1193,7 +1216,6 @@ class GestureBitmapViewTest {
         assertEquals(GestureBitmapView.DisplayType.CENTER_CROP, view.displayType)
 
         // set new value
-        val bitmap = mockk<Bitmap>()
         every { bitmap.isRecycled }.returns(false)
         every { bitmap.width }.returns(640)
         every { bitmap.height }.returns(480)
@@ -1253,7 +1275,6 @@ class GestureBitmapViewTest {
         assertEquals(identity, view.baseTransformationMatrix)
 
         // set new value
-        val bitmap = mockk<Bitmap>()
         every { bitmap.isRecycled }.returns(true)
         every { bitmap.width }.returns(640)
         every { bitmap.height }.returns(480)
@@ -1345,7 +1366,6 @@ class GestureBitmapViewTest {
         assertEquals(identity, view.baseTransformationMatrix)
 
         // set initial bitmap
-        val bitmap = mockk<Bitmap>()
         every { bitmap.isRecycled }.returns(false)
         every { bitmap.width }.returns(640)
         every { bitmap.height }.returns(480)
@@ -1421,7 +1441,6 @@ class GestureBitmapViewTest {
         assertEquals(identity, view.baseTransformationMatrix)
 
         // set initial bitmap
-        val bitmap = mockk<Bitmap>()
         every { bitmap.isRecycled }.returns(false)
         every { bitmap.width }.returns(640)
         every { bitmap.height }.returns(480)
@@ -1576,7 +1595,6 @@ class GestureBitmapViewTest {
         assertEquals(identity, view.baseTransformationMatrix)
 
         // set initial bitmap
-        val bitmap = mockk<Bitmap>()
         every { bitmap.isRecycled }.returns(false)
         every { bitmap.width }.returns(640)
         every { bitmap.height }.returns(480)
@@ -1667,7 +1685,6 @@ class GestureBitmapViewTest {
         assertEquals(identity, view.baseTransformationMatrix)
 
         // set bitmap
-        val bitmap = mockk<Bitmap>()
         every { bitmap.isRecycled }.returns(false)
         every { bitmap.width }.returns(640)
         every { bitmap.height }.returns(480)
@@ -1756,7 +1773,6 @@ class GestureBitmapViewTest {
         assertEquals(identity, view.baseTransformationMatrix)
 
         // set bitmap
-        val bitmap = mockk<Bitmap>()
         every { bitmap.isRecycled }.returns(false)
         every { bitmap.width }.returns(640)
         every { bitmap.height }.returns(480)
@@ -2213,11 +2229,9 @@ class GestureBitmapViewTest {
         assertTrue(view.twoFingerScrollEnabled)
 
         verify(exactly = 1) { gestureDetectorSpy.onTouchEvent(event) }
-        confirmVerified(gestureDetectorSpy)
         verify(exactly = 1) { scaleGestureDetectorSpy.onTouchEvent(event) }
-        confirmVerified(scaleGestureDetectorSpy)
         verify(exactly = 1) { rotationGestureDetectorSpy.onTouchEvent(event) }
-        confirmVerified(rotationGestureDetectorSpy)
+        confirmVerified(gestureDetectorSpy, scaleGestureDetectorSpy, rotationGestureDetectorSpy)
     }
 
     @Test
@@ -2275,11 +2289,9 @@ class GestureBitmapViewTest {
         assertTrue(view.twoFingerScrollEnabled)
 
         verify(exactly = 1) { gestureDetectorSpy.onTouchEvent(event) }
-        confirmVerified(gestureDetectorSpy)
         verify(exactly = 1) { scaleGestureDetectorSpy.onTouchEvent(event) }
-        confirmVerified(scaleGestureDetectorSpy)
         verify(exactly = 1) { rotationGestureDetectorSpy.onTouchEvent(event) }
-        confirmVerified(rotationGestureDetectorSpy)
+        confirmVerified(gestureDetectorSpy, scaleGestureDetectorSpy, rotationGestureDetectorSpy)
     }
 
     @Test
@@ -2293,8 +2305,8 @@ class GestureBitmapViewTest {
             view
         )
 
-        val event = mockk<MotionEvent>()
-        every { event.action }.returns(MotionEvent.ACTION_DOWN)
+        val uptimeMillis = SystemClock.uptimeMillis()
+        val event = MotionEvent.obtain(uptimeMillis, uptimeMillis, MotionEvent.ACTION_DOWN, 0.0f, 0.0f, 0)
 
         every { gestureDetectorSpy.onTouchEvent(event) }.returns(false)
 
@@ -2321,8 +2333,8 @@ class GestureBitmapViewTest {
             view
         )
 
-        val event = mockk<MotionEvent>()
-        every { event.action }.returns(MotionEvent.ACTION_DOWN)
+        val uptimeMillis = SystemClock.uptimeMillis()
+        val event = MotionEvent.obtain(uptimeMillis, uptimeMillis, MotionEvent.ACTION_DOWN, 0.0f, 0.0f, 0)
 
         every { gestureDetectorSpy.onTouchEvent(event) }.returns(false)
         every { rotationGestureDetectorSpy.onTouchEvent(event) }.returns(false)
@@ -2546,17 +2558,6 @@ class GestureBitmapViewTest {
     }
 
     @Test
-    fun onDraw_whenNoCanvas_makesNoAction() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val view = spyk(GestureBitmapView(context))
-
-        view.callPrivateFunc("onDraw", null)
-
-        verify(exactly = 1) { view.bitmap }
-        confirmVerified(view)
-    }
-
-    @Test
     fun onDraw_whenNoBitmap_makesNoAction() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val view = spyk(GestureBitmapView(context))
@@ -2569,31 +2570,10 @@ class GestureBitmapViewTest {
     }
 
     @Test
-    fun onDraw_whenNonRecycledBitmapButNoCanvas_makesNoAction() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val view = GestureBitmapView(context)
-
-        val bitmap = mockk<Bitmap>()
-        every { bitmap.isRecycled }.returns(false)
-        every { bitmap.width }.returns(640)
-        every { bitmap.height }.returns(480)
-
-        view.bitmap = bitmap
-
-        assertSame(bitmap, view.bitmap)
-        verify(exactly = 2) { bitmap.isRecycled }
-
-        view.callPrivateFunc("onDraw", null)
-
-        verify(exactly = 3) { bitmap.isRecycled }
-    }
-
-    @Test
     fun onDraw_whenRecycledBitmapWithCanvas_makesNoAction() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val view = GestureBitmapView(context)
 
-        val bitmap = mockk<Bitmap>()
         every { bitmap.isRecycled }.returnsMany(false, false, true)
         every { bitmap.width }.returns(640)
         every { bitmap.height }.returns(480)
@@ -2615,7 +2595,6 @@ class GestureBitmapViewTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val view = GestureBitmapView(context)
 
-        val bitmap = mockk<Bitmap>()
         every { bitmap.isRecycled }.returns(false)
         every { bitmap.width }.returns(640)
         every { bitmap.height }.returns(480)
@@ -2876,7 +2855,6 @@ class GestureBitmapViewTest {
             View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY)
         )
 
-        val bitmap = mockk<Bitmap>()
         every { bitmap.isRecycled }.returns(false)
         every { bitmap.width }.returns(640)
         every { bitmap.height }.returns(480)
@@ -2916,7 +2894,8 @@ class GestureBitmapViewTest {
         val clickListener = mockk<View.OnClickListener>(relaxUnitFun = true)
         view.setOnClickListener(clickListener)
 
-        assertTrue(gestureDetectorListener.onSingleTapConfirmed(null))
+        val motionEvent = mockk<MotionEvent>()
+        assertTrue(gestureDetectorListener.onSingleTapConfirmed(motionEvent))
 
         // check
         verify(exactly = 1) { clickListener.onClick(view) }
@@ -2938,152 +2917,13 @@ class GestureBitmapViewTest {
         require(gestureDetectorListener != null)
 
         // execute double tap
-        assertFalse(gestureDetectorListener.onDoubleTap(null))
+        val motionEvent = mockk<MotionEvent>()
+        assertFalse(gestureDetectorListener.onDoubleTap(motionEvent))
 
         // check
         verify(exactly = 1) { doubleTapListener.onDoubleTap(view) }
 
         assertEquals(1.0, view.transformationParameters.scale, 0.0)
-    }
-
-    @LooperMode(LooperMode.Mode.PAUSED)
-    @Test
-    fun gestureDoubleTap_whenEnabledButNoEvent_smoothlyScalesToViewCenterAndJumpsToNextScaleFactor() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val view = GestureBitmapView(context)
-
-        val minScaleReachedListener =
-            mockk<GestureBitmapView.OnMinScaleReachedListener>(relaxUnitFun = true)
-        view.minScaleReachedListener = minScaleReachedListener
-        val maxScaleReachedListener =
-            mockk<GestureBitmapView.OnMaxScaleReachedListener>(relaxUnitFun = true)
-        view.maxScaleReachedListener = maxScaleReachedListener
-        val scaleAnimationCompletedListener =
-            mockk<GestureBitmapView.OnScaleAnimationCompletedListener>(relaxUnitFun = true)
-        view.scaleAnimationCompletedListener = scaleAnimationCompletedListener
-
-        val doubleTapListener = mockk<GestureBitmapView.OnDoubleTapListener>(relaxUnitFun = true)
-        view.doubleTapListener = doubleTapListener
-        view.doubleTapEnabled = true
-
-        view.measure(
-            View.MeasureSpec.makeMeasureSpec(640, View.MeasureSpec.EXACTLY),
-            View.MeasureSpec.makeMeasureSpec(480, View.MeasureSpec.EXACTLY)
-        )
-        view.layout(0, 0, 640, 480)
-
-        assertEquals(10.0f, view.maxScale, 0.0f)
-        assertEquals(1.0f, view.minScale, 0.0f)
-        assertEquals(3.0f, view.scaleFactorJump, 0.0f)
-        var transformationParameters = view.transformationParameters
-        assertEquals(1.0, transformationParameters.scale, 0.0)
-        assertEquals(0.0, transformationParameters.horizontalTranslation, 0.0)
-        assertEquals(0.0, transformationParameters.verticalTranslation, 0.0)
-        assertEquals(0.0, transformationParameters.rotationAngle, 0.0)
-
-        val gestureDetector: GestureDetector? = view.getPrivateProperty("gestureDetector")
-        val gestureDetectorListener: GestureDetector.SimpleOnGestureListener? =
-            gestureDetector?.getPrivateProperty("mListener")
-
-        require(gestureDetectorListener != null)
-
-        // execute double tap
-        assertFalse(gestureDetectorListener.onDoubleTap(null))
-
-        // check
-        verify(exactly = 1) { doubleTapListener.onDoubleTap(view) }
-
-        //finish animation
-        Shadows.shadowOf(Looper.getMainLooper()).idle()
-
-        transformationParameters = view.transformationParameters
-        assertEquals(4.0, transformationParameters.scale, 0.0)
-        assertEquals(
-            -view.width / 2 * (transformationParameters.scale - 1.0),
-            transformationParameters.horizontalTranslation,
-            1.0
-        )
-        assertEquals(
-            -view.height / 2 * (transformationParameters.scale - 1),
-            transformationParameters.verticalTranslation, 1.0
-        )
-        assertEquals(0.0, transformationParameters.rotationAngle, 0.0)
-
-        verify(exactly = 1) { scaleAnimationCompletedListener.onScaleAnimationCompleted(view) }
-
-        // execute double tap again
-        assertFalse(gestureDetectorListener.onDoubleTap(null))
-
-        // check
-        verify(exactly = 2) { doubleTapListener.onDoubleTap(view) }
-
-        //finish animation
-        Shadows.shadowOf(Looper.getMainLooper()).idle()
-
-        transformationParameters = view.transformationParameters
-        assertEquals(7.0, transformationParameters.scale, 0.0)
-        assertEquals(
-            -view.width / 2 * (transformationParameters.scale - 1.0),
-            transformationParameters.horizontalTranslation,
-            1.0
-        )
-        assertEquals(
-            -view.height / 2 * (transformationParameters.scale - 1),
-            transformationParameters.verticalTranslation, 1.0
-        )
-        assertEquals(0.0, transformationParameters.rotationAngle, 0.0)
-
-        verify(exactly = 2) { scaleAnimationCompletedListener.onScaleAnimationCompleted(view) }
-
-        // execute double tap again
-        assertFalse(gestureDetectorListener.onDoubleTap(null))
-
-        // check
-        verify(exactly = 3) { doubleTapListener.onDoubleTap(view) }
-
-        //finish animation
-        Shadows.shadowOf(Looper.getMainLooper()).idle()
-
-        transformationParameters = view.transformationParameters
-        assertEquals(10.0, transformationParameters.scale, 0.0)
-        assertEquals(
-            -view.width / 2 * (transformationParameters.scale - 1.0),
-            transformationParameters.horizontalTranslation,
-            1.0
-        )
-        assertEquals(
-            -view.height / 2 * (transformationParameters.scale - 1),
-            transformationParameters.verticalTranslation, 1.0
-        )
-        assertEquals(0.0, transformationParameters.rotationAngle, 0.0)
-
-        verify(exactly = 3) { scaleAnimationCompletedListener.onScaleAnimationCompleted(view) }
-        verify(exactly = 1) { maxScaleReachedListener.onMaxScaleReached(view) }
-
-        // execute double tap again
-        assertFalse(gestureDetectorListener.onDoubleTap(null))
-
-        // check
-        verify(exactly = 4) { doubleTapListener.onDoubleTap(view) }
-
-        //finish animation
-        Shadows.shadowOf(Looper.getMainLooper()).idle()
-
-        transformationParameters = view.transformationParameters
-        assertEquals(1.0, transformationParameters.scale, 0.0)
-        assertEquals(
-            -view.width / 2 * (transformationParameters.scale - 1.0),
-            transformationParameters.horizontalTranslation,
-            1.0
-        )
-        assertEquals(
-            -view.height / 2 * (transformationParameters.scale - 1),
-            transformationParameters.verticalTranslation, 1.0
-        )
-        assertEquals(0.0, transformationParameters.rotationAngle, 0.0)
-
-        verify(exactly = 4) { scaleAnimationCompletedListener.onScaleAnimationCompleted(view) }
-        verify(exactly = 1) { minScaleReachedListener.onMinScaleReached(view) }
     }
 
     @LooperMode(LooperMode.Mode.PAUSED)
@@ -3350,7 +3190,8 @@ class GestureBitmapViewTest {
         assertEquals(0.0, transformationParameters.verticalTranslation, 0.0)
 
         // execute fling
-        assertFalse(gestureDetectorListener.onFling(null, null, 1.0f, 1.0f))
+        val motionEvent = mockk<MotionEvent>()
+        assertFalse(gestureDetectorListener.onFling(null, motionEvent, 1.0f, 1.0f))
 
         // check that transformation has not changed
         assertEquals(transformationParameters, view.transformationParameters)
@@ -3374,19 +3215,14 @@ class GestureBitmapViewTest {
         assertEquals(0.0, transformationParameters.verticalTranslation, 0.0)
 
         // execute fling
-        assertFalse(gestureDetectorListener.onFling(null, null, 1.0f, 1.0f))
+        val motionEvent = mockk<MotionEvent>()
+        assertFalse(gestureDetectorListener.onFling(null, motionEvent, 1.0f, 1.0f))
 
         // check that transformation has not changed
         assertEquals(transformationParameters, view.transformationParameters)
 
         // execute fling
         val event = mockk<MotionEvent>()
-        assertFalse(gestureDetectorListener.onFling(event, null, 1.0f, 1.0f))
-
-        // check that transformation has not changed
-        assertEquals(transformationParameters, view.transformationParameters)
-
-        // execute fling
         assertFalse(gestureDetectorListener.onFling(null, event, 1.0f, 1.0f))
 
         // check that transformation has not changed
@@ -3537,7 +3373,6 @@ class GestureBitmapViewTest {
         assertEquals(1.0, transformationParameters1.scale, 0.0)
 
         // set bitmap (make it large enough so that scroll can be made at larger scale)
-        val bitmap = mockk<Bitmap>()
         every { bitmap.isRecycled }.returns(false)
         every { bitmap.width }.returns(1080)
         every { bitmap.height }.returns(1920)
@@ -3628,7 +3463,6 @@ class GestureBitmapViewTest {
         assertEquals(1.0, transformationParameters1.scale, 0.0)
 
         // set bitmap (make it large enough so that scroll can be made at larger scale)
-        val bitmap = mockk<Bitmap>()
         every { bitmap.isRecycled }.returns(false)
         every { bitmap.width }.returns(1080)
         every { bitmap.height }.returns(1920)
@@ -3692,7 +3526,6 @@ class GestureBitmapViewTest {
         assertEquals(1.0, transformationParameters1.scale, 0.0)
 
         // set bitmap
-        val bitmap = mockk<Bitmap>()
         every { bitmap.isRecycled }.returns(false)
         every { bitmap.width }.returns(1080)
         every { bitmap.height }.returns(960)
@@ -3772,7 +3605,6 @@ class GestureBitmapViewTest {
         assertEquals(1.0, transformationParameters1.scale, 0.0)
 
         // set bitmap
-        val bitmap = mockk<Bitmap>()
         every { bitmap.isRecycled }.returns(false)
         every { bitmap.width }.returns(540)
         every { bitmap.height }.returns(1920)
@@ -3848,7 +3680,6 @@ class GestureBitmapViewTest {
         assertEquals(1.0, transformationParameters1.scale, 0.0)
 
         // set bitmap
-        val bitmap = mockk<Bitmap>()
         every { bitmap.isRecycled }.returns(false)
         every { bitmap.width }.returns(1080)
         every { bitmap.height }.returns(1920)
@@ -3929,7 +3760,6 @@ class GestureBitmapViewTest {
         assertEquals(1.0, transformationParameters1.scale, 0.0)
 
         // set bitmap
-        val bitmap = mockk<Bitmap>()
         every { bitmap.isRecycled }.returns(false)
         every { bitmap.width }.returns(1080)
         every { bitmap.height }.returns(1920)
@@ -4013,7 +3843,6 @@ class GestureBitmapViewTest {
         assertEquals(1.0, transformationParameters1.scale, 0.0)
 
         // set bitmap
-        val bitmap = mockk<Bitmap>()
         every { bitmap.isRecycled }.returns(false)
         every { bitmap.width }.returns(1080)
         every { bitmap.height }.returns(1920)
@@ -4094,7 +3923,6 @@ class GestureBitmapViewTest {
         assertEquals(1.0, transformationParameters1.scale, 0.0)
 
         // set bitmap
-        val bitmap = mockk<Bitmap>()
         every { bitmap.isRecycled }.returns(false)
         every { bitmap.width }.returns(1080)
         every { bitmap.height }.returns(1920)
@@ -4167,7 +3995,8 @@ class GestureBitmapViewTest {
         assertEquals(0.0, transformationParameters.verticalTranslation, 0.0)
 
         // execute scroll
-        assertFalse(gestureDetectorListener.onScroll(null, null, 1.0f, 1.0f))
+        val motionEvent = mockk<MotionEvent>()
+        assertFalse(gestureDetectorListener.onScroll(null, motionEvent, 1.0f, 1.0f))
 
         // check that transformation has not changed
         assertEquals(transformationParameters, view.transformationParameters)
@@ -4191,19 +4020,14 @@ class GestureBitmapViewTest {
         assertEquals(0.0, transformationParameters.verticalTranslation, 0.0)
 
         // execute scroll
-        assertFalse(gestureDetectorListener.onScroll(null, null, 1.0f, 1.0f))
+        val motionEvent = mockk<MotionEvent>()
+        assertFalse(gestureDetectorListener.onScroll(null, motionEvent, 1.0f, 1.0f))
 
         // check that transformation has not changed
         assertEquals(transformationParameters, view.transformationParameters)
 
         // execute scroll
         val event = mockk<MotionEvent>()
-        assertFalse(gestureDetectorListener.onScroll(event, null, 1.0f, 1.0f))
-
-        // check that transformation has not changed
-        assertEquals(transformationParameters, view.transformationParameters)
-
-        // execute scroll
         assertFalse(gestureDetectorListener.onScroll(null, event, 1.0f, 1.0f))
 
         // check that transformation has not changed
@@ -4367,7 +4191,6 @@ class GestureBitmapViewTest {
         assertEquals(1.0, transformationParameters1.scale, 0.0)
 
         // set bitmap (make it large enough so that scroll can be made at larger scale)
-        val bitmap = mockk<Bitmap>()
         every { bitmap.isRecycled }.returns(false)
         every { bitmap.width }.returns(1080)
         every { bitmap.height }.returns(1920)
@@ -4420,7 +4243,8 @@ class GestureBitmapViewTest {
         view.setOnLongClickListener(longClickListener)
         view.isLongClickable = false
 
-        gestureDetectorListener.onLongPress(null)
+        val motionEvent = mockk<MotionEvent>()
+        gestureDetectorListener.onLongPress(motionEvent)
 
         // check
         verify { longClickListener wasNot Called }
@@ -4451,7 +4275,8 @@ class GestureBitmapViewTest {
         view.setOnLongClickListener(longClickListener)
         view.isLongClickable = true
 
-        gestureDetectorListener.onLongPress(null)
+        val motionEvent = mockk<MotionEvent>()
+        gestureDetectorListener.onLongPress(motionEvent)
 
         // check
         verify { longClickListener wasNot Called }
@@ -4471,34 +4296,15 @@ class GestureBitmapViewTest {
         // execute long press
         val longClickListener = mockk<View.OnLongClickListener>()
         every { longClickListener.onLongClick(view) }.returns(true)
+        every { longClickListener.onLongClickUseDefaultHapticFeedback(view) }.returns(true)
         view.setOnLongClickListener(longClickListener)
         view.isLongClickable = true
 
-        gestureDetectorListener.onLongPress(null)
+        val motionEvent = mockk<MotionEvent>()
+        gestureDetectorListener.onLongPress(motionEvent)
 
         // check
         verify(exactly = 1) { longClickListener.onLongClick(view) }
-    }
-
-    @Test
-    fun gestureScale_whenNoDetector_makesNoAction() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val view = GestureBitmapView(context)
-
-        val scaleGestureDetector: ScaleGestureDetector? =
-            view.getPrivateProperty("scaleGestureDetector")
-        val scaleGestureDetectorListener: ScaleGestureDetector.SimpleOnScaleGestureListener? =
-            scaleGestureDetector?.getPrivateProperty("mListener")
-
-        require(scaleGestureDetectorListener != null)
-
-        assertEquals(1.0, view.transformationParameters.scale, 0.0)
-
-        // execute onScale
-        assertFalse(scaleGestureDetectorListener.onScale(null))
-
-        // scale remains unchanged
-        assertEquals(1.0, view.transformationParameters.scale, 0.0)
     }
 
     @Test

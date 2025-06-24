@@ -1,3 +1,19 @@
+/*
+ * Copyright (C) 2025 Alberto Irurueta Carro (alberto@irurueta.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.irurueta.android.gesturebitmap
 
 import android.animation.Animator
@@ -18,6 +34,7 @@ import android.view.animation.AccelerateInterpolator
 import android.view.animation.DecelerateInterpolator
 import androidx.core.graphics.drawable.toBitmap
 import kotlin.math.*
+import androidx.core.content.withStyledAttributes
 
 /**
  * View used to display a bitmap allowing gestures to change view zooming, panning and rotation.
@@ -529,19 +546,19 @@ class GestureBitmapView @JvmOverloads constructor(
         }
 
         val gestureHandled = if (twoFingerScrollEnabled || scrollEnabled || scaleEnabled) {
-            gestureDetector?.onTouchEvent(event) ?: false
+            gestureDetector?.onTouchEvent(event) == true
         } else {
             false
         }
 
         val scaleHandled = if (scaleEnabled) {
-            scaleGestureDetector?.onTouchEvent(event) ?: false
+            scaleGestureDetector?.onTouchEvent(event) == true
         } else {
             false
         }
 
         val rotationHandled = if (rotationEnabled) {
-            rotationGestureDetector?.onTouchEvent(event) ?: false
+            rotationGestureDetector?.onTouchEvent(event) == true
         } else {
             false
         }
@@ -563,14 +580,14 @@ class GestureBitmapView @JvmOverloads constructor(
      *
      * @param canvas canvas where view will be drawn.
      */
-    override fun onDraw(canvas: Canvas?) {
+    override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
         // draw bitmap
         val bitmap = this.bitmap
         if (bitmap != null && !bitmap.isRecycled) {
             val displayMatrix = displayTransformationMatrix
-            canvas?.drawBitmap(bitmap, displayMatrix, bitmapPaint)
+            canvas.drawBitmap(bitmap, displayMatrix, bitmapPaint)
         }
     }
 
@@ -1302,7 +1319,7 @@ class GestureBitmapView @JvmOverloads constructor(
         translateAnimator.addListener(object : Animator.AnimatorListener {
             var cancelled = false
 
-            override fun onAnimationEnd(animation: Animator?) {
+            override fun onAnimationEnd(animation: Animator) {
                 if (!cancelled) {
                     updateTranslation(tx, ty, invalidate = true)
                 }
@@ -1312,15 +1329,15 @@ class GestureBitmapView @JvmOverloads constructor(
                 )
             }
 
-            override fun onAnimationRepeat(animation: Animator?) {
+            override fun onAnimationRepeat(animation: Animator) {
                 // not used
             }
 
-            override fun onAnimationCancel(animation: Animator?) {
+            override fun onAnimationCancel(animation: Animator) {
                 cancelled = true
             }
 
-            override fun onAnimationStart(animation: Animator?) {
+            override fun onAnimationStart(animation: Animator) {
                 // not used
             }
         })
@@ -1366,7 +1383,7 @@ class GestureBitmapView @JvmOverloads constructor(
         scaleAnimator.addListener(object : Animator.AnimatorListener {
             var cancelled = false
 
-            override fun onAnimationEnd(animation: Animator?) {
+            override fun onAnimationEnd(animation: Animator) {
                 if (!cancelled) {
                     updateScale(
                         scale.toDouble(), pivotX, pivotY,
@@ -1398,15 +1415,15 @@ class GestureBitmapView @JvmOverloads constructor(
                 }
             }
 
-            override fun onAnimationRepeat(animation: Animator?) {
+            override fun onAnimationRepeat(animation: Animator) {
                 // not used
             }
 
-            override fun onAnimationCancel(animation: Animator?) {
+            override fun onAnimationCancel(animation: Animator) {
                 cancelled = true
             }
 
-            override fun onAnimationStart(animation: Animator?) {
+            override fun onAnimationStart(animation: Animator) {
                 // not used
             }
         })
@@ -1469,7 +1486,7 @@ class GestureBitmapView @JvmOverloads constructor(
         rotateAndTranslateAnimator.addListener(object : Animator.AnimatorListener {
             var cancelled = false
 
-            override fun onAnimationEnd(animation: Animator?) {
+            override fun onAnimationEnd(animation: Animator) {
                 if (!cancelled) {
                     updateRotationAndTranslation(rotationAngle, pivotX, pivotY, tx, ty)
                 }
@@ -1479,16 +1496,16 @@ class GestureBitmapView @JvmOverloads constructor(
                 )
             }
 
-            override fun onAnimationRepeat(animation: Animator?) {
+            override fun onAnimationRepeat(animation: Animator) {
                 // not used
             }
 
 
-            override fun onAnimationCancel(animation: Animator?) {
+            override fun onAnimationCancel(animation: Animator) {
                 cancelled = true
             }
 
-            override fun onAnimationStart(animation: Animator?) {
+            override fun onAnimationStart(animation: Animator) {
                 // not used
             }
 
@@ -1713,64 +1730,63 @@ class GestureBitmapView @JvmOverloads constructor(
             return
         }
 
-        val a =
-            context.obtainStyledAttributes(attrs, R.styleable.GestureBitmapView, defStyleAttr, 0)
+        context.withStyledAttributes(attrs, R.styleable.GestureBitmapView, defStyleAttr, 0) {
 
-        val drawable = a.getDrawable(R.styleable.GestureBitmapView_src)
-        setDrawable(drawable)
+            val drawable = getDrawable(R.styleable.GestureBitmapView_src)
+            setDrawable(drawable)
 
-        val displayTypeIndex = a.getInt(
-            R.styleable.GestureBitmapView_displayType,
-            displayType.ordinal
-        )
-        val displayType = DisplayType.values()[displayTypeIndex]
-        this.displayType = displayType
+            val displayTypeIndex = getInt(
+                R.styleable.GestureBitmapView_displayType,
+                displayType.ordinal
+            )
+            val displayType = DisplayType.entries[displayTypeIndex]
+            this@GestureBitmapView.displayType = displayType
 
-        animationDurationMillis = a.getInt(
-            R.styleable.GestureBitmapView_animationDurationMillis,
-            animationDurationMillis.toInt()
-        ).toLong()
+            animationDurationMillis = getInt(
+                R.styleable.GestureBitmapView_animationDurationMillis,
+                animationDurationMillis.toInt()
+            ).toLong()
 
-        rotationEnabled =
-            a.getBoolean(R.styleable.GestureBitmapView_rotationEnabled, rotationEnabled)
+            rotationEnabled =
+                getBoolean(R.styleable.GestureBitmapView_rotationEnabled, rotationEnabled)
 
-        scaleEnabled = a.getBoolean(R.styleable.GestureBitmapView_scaleEnabled, scaleEnabled)
+            scaleEnabled = getBoolean(R.styleable.GestureBitmapView_scaleEnabled, scaleEnabled)
 
-        scrollEnabled = a.getBoolean(R.styleable.GestureBitmapView_scrollEnabled, scrollEnabled)
+            scrollEnabled = getBoolean(R.styleable.GestureBitmapView_scrollEnabled, scrollEnabled)
 
-        twoFingerScrollEnabled = a.getBoolean(
-            R.styleable.GestureBitmapView_twoFingerScrollEnabled,
-            twoFingerScrollEnabled
-        )
+            twoFingerScrollEnabled = getBoolean(
+                R.styleable.GestureBitmapView_twoFingerScrollEnabled,
+                twoFingerScrollEnabled
+            )
 
-        exclusiveTwoFingerScrollEnabled = a.getBoolean(
-            R.styleable.GestureBitmapView_exclusiveTwoFingerScrollEnabled,
-            exclusiveTwoFingerScrollEnabled
-        )
+            exclusiveTwoFingerScrollEnabled = getBoolean(
+                R.styleable.GestureBitmapView_exclusiveTwoFingerScrollEnabled,
+                exclusiveTwoFingerScrollEnabled
+            )
 
-        doubleTapEnabled =
-            a.getBoolean(R.styleable.GestureBitmapView_doubleTapEnabled, doubleTapEnabled)
+            doubleTapEnabled =
+                getBoolean(R.styleable.GestureBitmapView_doubleTapEnabled, doubleTapEnabled)
 
-        minScale = a.getFloat(R.styleable.GestureBitmapView_minScale, minScale)
+            minScale = getFloat(R.styleable.GestureBitmapView_minScale, minScale)
 
-        maxScale = a.getFloat(R.styleable.GestureBitmapView_maxScale, maxScale)
+            maxScale = getFloat(R.styleable.GestureBitmapView_maxScale, maxScale)
 
-        scaleFactorJump =
-            a.getFloat(R.styleable.GestureBitmapView_scaleFactorJump, scaleFactorJump)
+            scaleFactorJump =
+                getFloat(R.styleable.GestureBitmapView_scaleFactorJump, scaleFactorJump)
 
-        minScaleMargin = a.getFloat(R.styleable.GestureBitmapView_minScaleMargin, minScaleMargin)
-        maxScaleMargin = a.getFloat(R.styleable.GestureBitmapView_maxScaleMargin, maxScaleMargin)
+            minScaleMargin = getFloat(R.styleable.GestureBitmapView_minScaleMargin, minScaleMargin)
+            maxScaleMargin = getFloat(R.styleable.GestureBitmapView_maxScaleMargin, maxScaleMargin)
 
-        leftScrollMargin =
-            a.getFloat(R.styleable.GestureBitmapView_leftScrollMargin, leftScrollMargin)
-        topScrollMargin =
-            a.getFloat(R.styleable.GestureBitmapView_topScrollMargin, topScrollMargin)
-        rightScrollMargin =
-            a.getFloat(R.styleable.GestureBitmapView_rightScrollMargin, rightScrollMargin)
-        bottomScrollMargin =
-            a.getFloat(R.styleable.GestureBitmapView_bottomScrollMargin, bottomScrollMargin)
+            leftScrollMargin =
+                getFloat(R.styleable.GestureBitmapView_leftScrollMargin, leftScrollMargin)
+            topScrollMargin =
+                getFloat(R.styleable.GestureBitmapView_topScrollMargin, topScrollMargin)
+            rightScrollMargin =
+                getFloat(R.styleable.GestureBitmapView_rightScrollMargin, rightScrollMargin)
+            bottomScrollMargin =
+                getFloat(R.styleable.GestureBitmapView_bottomScrollMargin, bottomScrollMargin)
 
-        a.recycle()
+        }
     }
 
     init {
@@ -1805,11 +1821,7 @@ class GestureBitmapView @JvmOverloads constructor(
                 context,
                 object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
 
-                    override fun onScale(detector: ScaleGestureDetector?): Boolean {
-                        if (detector == null) {
-                            return false
-                        }
-
+                    override fun onScale(detector: ScaleGestureDetector): Boolean {
                         val span = detector.currentSpan - detector.previousSpan
                         if (span == 0.0f) {
                             return false
@@ -1843,17 +1855,17 @@ class GestureBitmapView @JvmOverloads constructor(
         gestureDetector =
             GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
 
-                override fun onSingleTapConfirmed(e: MotionEvent?): Boolean {
+                override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
                     performClick()
                     return true
                 }
 
-                override fun onDoubleTap(e: MotionEvent?): Boolean {
+                override fun onDoubleTap(e: MotionEvent): Boolean {
                     if (doubleTapEnabled) {
                         var targetScale = newScaleOnDoubleTap()
                         targetScale = min(maxScale, max(targetScale, minScale))
-                        val pivotX = (e?.x) ?: (width.toFloat() / 2.0f)
-                        val pivotY = (e?.y) ?: (height.toFloat() / 2.0f)
+                        val pivotX = e.x
+                        val pivotY = e.y
                         smoothScaleTo(targetScale, pivotX, pivotY)
                     }
 
@@ -1866,7 +1878,7 @@ class GestureBitmapView @JvmOverloads constructor(
 
                 override fun onFling(
                     e1: MotionEvent?,
-                    e2: MotionEvent?,
+                    e2: MotionEvent,
                     velocityX: Float,
                     velocityY: Float
                 ): Boolean {
@@ -1874,7 +1886,7 @@ class GestureBitmapView @JvmOverloads constructor(
                         return false
                     }
 
-                    if (e1 == null || e2 == null) {
+                    if (e1 == null) {
                         return false
                     }
                     if (exclusiveTwoFingerScrollEnabled) {
@@ -1902,7 +1914,7 @@ class GestureBitmapView @JvmOverloads constructor(
 
                 override fun onScroll(
                     e1: MotionEvent?,
-                    e2: MotionEvent?,
+                    e2: MotionEvent,
                     distanceX: Float,
                     distanceY: Float
                 ): Boolean {
@@ -1911,7 +1923,7 @@ class GestureBitmapView @JvmOverloads constructor(
                     if (!scrollEnabled) {
                         return false
                     }
-                    if (e1 == null || e2 == null) {
+                    if (e1 == null) {
                         return false
                     }
                     if (exclusiveTwoFingerScrollEnabled) {
@@ -1943,9 +1955,9 @@ class GestureBitmapView @JvmOverloads constructor(
                     return true
                 }
 
-                override fun onLongPress(e: MotionEvent?) {
+                override fun onLongPress(e: MotionEvent) {
                     if (isLongClickable) {
-                        val scaleInProgress = (scaleGestureDetector?.isInProgress) ?: false
+                        val scaleInProgress = (scaleGestureDetector?.isInProgress) == true
                         if (!scaleInProgress) {
                             isPressed = true
                             performLongClick()

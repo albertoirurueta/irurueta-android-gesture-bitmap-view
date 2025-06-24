@@ -35,7 +35,7 @@ and rotate displayed bitmap.
 Add the following dependency to your project:
 
 ```
-implementation 'com.irurueta:irurueta-android-gesture-bitmap-view:1.0.1'
+implementation 'com.irurueta:irurueta-android-gesture-bitmap-view:1.1.0'
 ```
 
 The view can be added to your xml layout as the example below:
@@ -162,7 +162,7 @@ gradlew sonarqube
 To convert exec files to xml and html reports:
 
 ```
-java -jar jacoco-0.8.7/lib/jacococli.jar report lib/build/jacoco/testReleaseUnitTest.exec --classfiles lib/build/tmp/kotlin-classes/release --html lib/build/reports/coverage/test --xml lib/build/reports/coverage/test/report.xml
+java -jar jacoco-0.8.13/lib/jacococli.jar report lib/build/jacoco/testReleaseUnitTest.exec --classfiles lib/build/tmp/kotlin-classes/debug --sourcefiles lib/src/main/java --html lib/build/reports/coverage/test --xml lib/build/reports/coverage/test/report.xml
 ```
 
 Github actions to release library in maven central has been configured following:
