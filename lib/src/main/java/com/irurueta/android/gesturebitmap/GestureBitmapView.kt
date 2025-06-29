@@ -280,7 +280,7 @@ class GestureBitmapView @JvmOverloads constructor(
                 resetTransformationParameters()
             } else {
                 cancelAllAnimators()
-                invalidate()
+                postInvalidate()
             }
         }
     }
@@ -332,7 +332,7 @@ class GestureBitmapView @JvmOverloads constructor(
                 paramsMatrix.preConcat(invBaseMatrix)
 
                 updateDisplayMatrix()
-                invalidate()
+                postInvalidate()
             }
         }
 
@@ -447,7 +447,7 @@ class GestureBitmapView @JvmOverloads constructor(
         cancelAllAnimators()
         paramsMatrix.reset()
         updateDisplayMatrix()
-        invalidate()
+        postInvalidate()
     }
 
     /**
@@ -466,7 +466,7 @@ class GestureBitmapView @JvmOverloads constructor(
             cancelAllAnimators()
             setTransformationParameters(value, paramsMatrix)
             updateDisplayMatrix()
-            invalidate()
+            postInvalidate()
         }
 
     /**
@@ -566,7 +566,7 @@ class GestureBitmapView @JvmOverloads constructor(
 
         if (gestureHandled || scaleHandled || rotationHandled) {
             updateDisplayMatrix()
-            invalidate()
+            postInvalidate()
         }
 
         if (action == MotionEvent.ACTION_UP) {
@@ -683,7 +683,7 @@ class GestureBitmapView @JvmOverloads constructor(
         }
 
         // request redraw
-        invalidate()
+        postInvalidate()
     }
 
     /**
@@ -702,7 +702,7 @@ class GestureBitmapView @JvmOverloads constructor(
             cancelAllAnimators()
             computeBaseMatrix(bitmap, displayType, baseMatrix)
             updateDisplayMatrix()
-            invalidate()
+            postInvalidate()
         }
     }
 
@@ -974,7 +974,7 @@ class GestureBitmapView @JvmOverloads constructor(
         setTransformationParameters(parameters, paramsMatrix)
         if (invalidate) {
             updateDisplayMatrix()
-            invalidate()
+            postInvalidate()
         }
     }
 
@@ -1098,7 +1098,7 @@ class GestureBitmapView @JvmOverloads constructor(
         setTransformationParameters(parameters, paramsMatrix)
         if (invalidate) {
             updateDisplayMatrix()
-            invalidate()
+            postInvalidate()
         }
     }
 
@@ -1257,7 +1257,7 @@ class GestureBitmapView @JvmOverloads constructor(
         setTransformationParameters(parameters, paramsMatrix)
         if (invalidate) {
             updateDisplayMatrix()
-            invalidate()
+            postInvalidate()
         }
     }
 

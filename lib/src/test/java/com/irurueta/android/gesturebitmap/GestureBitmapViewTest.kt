@@ -29,6 +29,7 @@ import android.os.SystemClock
 import android.util.AttributeSet
 import android.view.*
 import androidx.core.graphics.drawable.toBitmap
+import androidx.core.os.BundleCompat
 import androidx.test.core.app.ApplicationProvider
 import com.irurueta.statistics.UniformRandomizer
 import io.mockk.*
@@ -2649,7 +2650,8 @@ class GestureBitmapViewTest {
             )
         )
         assertEquals(view.doubleTapEnabled, bundle.getBoolean(DOUBLE_TAP_ENABLED_KEY))
-        assertEquals(view.displayType, bundle.getSerializable(DISPLAY_TYPE_KEY))
+        assertEquals(view.displayType, BundleCompat.getSerializable(bundle, DISPLAY_TYPE_KEY,
+            GestureBitmapView.DisplayType::class.java))
         assertEquals(view.minScale, bundle.getFloat(MIN_SCALE_KEY), 0.0f)
         assertEquals(view.maxScale, bundle.getFloat(MAX_SCALE_KEY), 0.0f)
         assertEquals(view.scaleFactorJump, bundle.getFloat(SCALE_FACTOR_JUMP_KEY), 0.0f)
@@ -3381,7 +3383,7 @@ class GestureBitmapViewTest {
 
         // set a scale larger than one after setting bitmap (otherwise scale is reset)
         transformationParameters1.scale = 2.0
-        // make sure that bitmap is centered so that sroll is not limited
+        // make sure that bitmap is centered so that scroll is not limited
         transformationParameters1.horizontalTranslation = (-view.width / 2).toDouble()
         transformationParameters1.verticalTranslation = (-view.height / 2).toDouble()
         view.transformationParameters = transformationParameters1
@@ -3475,7 +3477,7 @@ class GestureBitmapViewTest {
 
         // set a scale larger than one after setting bitmap (otherwise scale is reset)
         transformationParameters1.scale = 2.0
-        // make sure that bitmap is centered so that sroll is not limited
+        // make sure that bitmap is centered so that scroll is not limited
         transformationParameters1.horizontalTranslation = (-view.width / 2).toDouble()
         transformationParameters1.verticalTranslation = (-view.height / 2).toDouble()
         view.transformationParameters = transformationParameters1
@@ -4199,7 +4201,7 @@ class GestureBitmapViewTest {
 
         // set a scale larger than one after setting bitmap (otherwise scale is reset)
         transformationParameters1.scale = 2.0
-        // make sure that bitmap is centered so that sroll is not limited
+        // make sure that bitmap is centered so that scroll is not limited
         transformationParameters1.horizontalTranslation = (-view.width / 2).toDouble()
         transformationParameters1.verticalTranslation = (-view.height / 2).toDouble()
         view.transformationParameters = transformationParameters1
