@@ -35,6 +35,7 @@ import android.view.animation.DecelerateInterpolator
 import androidx.core.graphics.drawable.toBitmap
 import kotlin.math.*
 import androidx.core.content.withStyledAttributes
+import androidx.core.os.BundleCompat
 
 /**
  * View used to display a bitmap allowing gestures to change view zooming, panning and rotation.
@@ -116,7 +117,7 @@ class GestureBitmapView @JvmOverloads constructor(
     private var scrollDiff = PointF()
 
     /**
-     * Rectangle to containing displayed bitmap to be reused during scroll
+     * Rectangle containing displayed bitmap to be reused during scroll
      * limit computation.
      */
     private var bitmapDisplayedRect = RectF()
@@ -641,11 +642,16 @@ class GestureBitmapView @JvmOverloads constructor(
      * @param state stored view state.
      */
     override fun onRestoreInstanceState(state: Parcelable?) {
-        val viewState = if (state is Bundle) state.getParcelable(SUPER_STATE_KEY) else state
+        val viewState = if (state is Bundle) {
+            BundleCompat.getParcelable<Parcelable>(state, SUPER_STATE_KEY, Parcelable::class.java)
+        } else {
+            state
+        }
         super.onRestoreInstanceState(viewState)
 
         if (state is Bundle) {
-            displayType = state.getSerializable(DISPLAY_TYPE_KEY) as DisplayType
+            displayType = BundleCompat.getSerializable(state, DISPLAY_TYPE_KEY,
+                DisplayType::class.java)!!
 
             val baseMatrixValues = state.getFloatArray(BASE_MATRIX_KEY)
             baseMatrix.setValues(baseMatrixValues)
@@ -927,15 +933,15 @@ class GestureBitmapView @JvmOverloads constructor(
      * @param result instance where result will be stored.
      */
     private fun getDisplayMatrix(baseMatrix: Matrix, paramsMatrix: Matrix, result: Matrix) {
-        //We want to get displayMatrix = suppMatrix * baseMatrix
+        //We want to get displayMatrix = paramsMatrix * baseMatrix
 
-        // firs make result the identity
+        // first make result the identity
         result.reset()
 
-        // dispplayMatrix = I * paramsMatrix
+        // displayMatrix = I * paramsMatrix
         result.preConcat(paramsMatrix)
 
-        // displayMatrix = I * suppMatrix * baseMatrix
+        // displayMatrix = I * paramsMatrix * baseMatrix
         result.preConcat(baseMatrix)
     }
 
