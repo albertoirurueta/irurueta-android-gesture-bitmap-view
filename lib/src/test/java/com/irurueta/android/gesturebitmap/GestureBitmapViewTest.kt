@@ -135,6 +135,8 @@ class GestureBitmapViewTest {
         assertEquals(identity, view.displayTransformationMatrix)
 
         assertNull(view.displayRect)
+
+        assertTrue(view.isAntialiasingEnabled)
     }
 
     @Test
@@ -282,6 +284,8 @@ class GestureBitmapViewTest {
         assertEquals(175.0f, view.rightScrollMargin, 0.0f)
         assertEquals(200.0f, view.bottomScrollMargin, 0.0f)
         verify(exactly = 2) { typedArray.recycle() }
+
+        assertTrue(view.isAntialiasingEnabled)
     }
 
     @Test
@@ -2023,6 +2027,21 @@ class GestureBitmapViewTest {
 
         // check default value
         assertThrows(IllegalArgumentException::class.java) { view.bottomScrollMargin = -1.0f }
+    }
+
+    @Test
+    fun isAntialiasingEnabled_returnsExpectedValue() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val view = GestureBitmapView(context)
+
+        // check default value
+        assertTrue(view.isAntialiasingEnabled)
+
+        // set new value
+        view.isAntialiasingEnabled = false
+
+        // check
+        assertFalse(view.isAntialiasingEnabled)
     }
 
     @Test

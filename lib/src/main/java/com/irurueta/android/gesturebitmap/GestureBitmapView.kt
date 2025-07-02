@@ -21,7 +21,12 @@ import android.animation.FloatArrayEvaluator
 import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.Context
-import android.graphics.*
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Matrix
+import android.graphics.Paint
+import android.graphics.PointF
+import android.graphics.RectF
 import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.os.Parcelable
@@ -32,10 +37,14 @@ import android.view.ScaleGestureDetector
 import android.view.View
 import android.view.animation.AccelerateInterpolator
 import android.view.animation.DecelerateInterpolator
-import androidx.core.graphics.drawable.toBitmap
-import kotlin.math.*
 import androidx.core.content.withStyledAttributes
+import androidx.core.graphics.drawable.toBitmap
 import androidx.core.os.BundleCompat
+import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.sin
 
 /**
  * View used to display a bitmap allowing gestures to change view zooming, panning and rotation.
@@ -440,6 +449,17 @@ class GestureBitmapView @JvmOverloads constructor(
         }
 
     /**
+     * Indicates whether antialiasing is enabled or not.
+     */
+    var isAntialiasingEnabled: Boolean
+        get() {
+            return bitmapPaint.isAntiAlias
+        }
+        set(value) {
+            bitmapPaint.isAntiAlias = value
+        }
+
+    /**
      * Resets matrix containing changes on image (scale and translation) and
      * forces view redraw.
      */
@@ -643,15 +663,17 @@ class GestureBitmapView @JvmOverloads constructor(
      */
     override fun onRestoreInstanceState(state: Parcelable?) {
         val viewState = if (state is Bundle) {
-            BundleCompat.getParcelable<Parcelable>(state, SUPER_STATE_KEY, Parcelable::class.java)
+            BundleCompat.getParcelable(state, SUPER_STATE_KEY, Parcelable::class.java)
         } else {
             state
         }
         super.onRestoreInstanceState(viewState)
 
         if (state is Bundle) {
-            displayType = BundleCompat.getSerializable(state, DISPLAY_TYPE_KEY,
-                DisplayType::class.java)!!
+            displayType = BundleCompat.getSerializable(
+                state, DISPLAY_TYPE_KEY,
+                DisplayType::class.java
+            )!!
 
             val baseMatrixValues = state.getFloatArray(BASE_MATRIX_KEY)
             baseMatrix.setValues(baseMatrixValues)
@@ -727,7 +749,8 @@ class GestureBitmapView @JvmOverloads constructor(
             val scaleAnimator = this.scaleAnimator
             if ((translateAnimator == null && scaleAnimator == null) ||
                 (translateAnimator != null && !translateAnimator.isRunning &&
-                        scaleAnimator != null && !scaleAnimator.isRunning)) {
+                        scaleAnimator != null && !scaleAnimator.isRunning)
+            ) {
                 smoothScrollBy(0.0f, 0.0f)
             }
         }
@@ -1108,13 +1131,11 @@ class GestureBitmapView @JvmOverloads constructor(
      * @param rotationAngle new rotation angle to be set.
      * @param pivotX horizontal coordinate of pivot point.
      * @param pivotY vertical coordinate of pivot point.
-     * @param invalidate if true, view is invalidated.
      */
     private fun updateRotation(
         rotationAngle: Float,
         pivotX: Float,
-        pivotY: Float,
-        invalidate: Boolean
+        pivotY: Float
     ) {
         /*
 
@@ -1255,10 +1276,7 @@ class GestureBitmapView @JvmOverloads constructor(
         parameters.verticalTranslation = sinDiffTheta * diffTx + cosDiffTheta * diffTy + pivotY
 
         setTransformationParameters(parameters, paramsMatrix)
-        if (invalidate) {
-            updateDisplayMatrix()
-            postInvalidate()
-        }
+        updateDisplayMatrix()
     }
 
     /**
@@ -1278,7 +1296,7 @@ class GestureBitmapView @JvmOverloads constructor(
         tx: Float,
         ty: Float,
     ) {
-        updateRotation(rotationAngle, pivotX, pivotY, invalidate = true)
+        updateRotation(rotationAngle, pivotX, pivotY)
         updateTranslation(tx, ty, invalidate = true)
     }
 
@@ -1609,6 +1627,7 @@ class GestureBitmapView @JvmOverloads constructor(
                 // returns identity matrix
                 result.reset()
             }
+
             DisplayType.FIT_IF_BIGGER -> {
                 if (bitmapWidth > viewWidth || bitmapHeight > viewHeight) {
                     val scaleWidth = viewWidth / bitmapWidth
@@ -1632,6 +1651,7 @@ class GestureBitmapView @JvmOverloads constructor(
                     result.reset()
                 }
             }
+
             DisplayType.FIT_X_TOP -> {
                 val scale = viewWidth / bitmapWidth
                 val newHeight = scale * bitmapHeight
@@ -1639,6 +1659,7 @@ class GestureBitmapView @JvmOverloads constructor(
 
                 result.setRectToRect(bitmapRect, dstRect, Matrix.ScaleToFit.CENTER)
             }
+
             DisplayType.FIT_X_BOTTOM -> {
                 val scale = viewWidth / bitmapWidth
                 val newHeight = scale * bitmapHeight
@@ -1647,6 +1668,7 @@ class GestureBitmapView @JvmOverloads constructor(
 
                 result.setRectToRect(bitmapRect, dstRect, Matrix.ScaleToFit.CENTER)
             }
+
             DisplayType.FIT_X_CENTER -> {
                 val scale = viewWidth / bitmapWidth
                 val newHeight = scale * bitmapHeight
@@ -1655,6 +1677,7 @@ class GestureBitmapView @JvmOverloads constructor(
 
                 result.setRectToRect(bitmapRect, dstRect, Matrix.ScaleToFit.CENTER)
             }
+
             DisplayType.FIT_Y_LEFT -> {
                 val scale = viewHeight / bitmapHeight
                 val newWidth = scale * bitmapWidth
@@ -1662,6 +1685,7 @@ class GestureBitmapView @JvmOverloads constructor(
 
                 result.setRectToRect(bitmapRect, dstRect, Matrix.ScaleToFit.CENTER)
             }
+
             DisplayType.FIT_Y_RIGHT -> {
                 val scale = viewHeight / bitmapHeight
                 val newWidth = scale * bitmapWidth
@@ -1670,6 +1694,7 @@ class GestureBitmapView @JvmOverloads constructor(
 
                 result.setRectToRect(bitmapRect, dstRect, Matrix.ScaleToFit.CENTER)
             }
+
             DisplayType.FIT_Y_CENTER -> {
                 val scale = viewHeight / bitmapHeight
                 val newWidth = scale * bitmapWidth
@@ -1678,6 +1703,7 @@ class GestureBitmapView @JvmOverloads constructor(
 
                 result.setRectToRect(bitmapRect, dstRect, Matrix.ScaleToFit.CENTER)
             }
+
             DisplayType.CENTER_CROP -> {
                 val scaleWidth = viewWidth / bitmapWidth
                 val scaleHeight = viewHeight / bitmapHeight
@@ -1813,10 +1839,7 @@ class GestureBitmapView @JvmOverloads constructor(
                     val oldRotation = parameters.rotationAngle
                     val newRotation = (oldRotation + angle).toFloat()
 
-                    updateRotation(
-                        newRotation, pivotX, pivotY,
-                        invalidate = false
-                    )
+                    updateRotation(newRotation, pivotX, pivotY)
 
                     return true
                 }
