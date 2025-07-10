@@ -99,8 +99,6 @@ sonar {
 
 dependencies {
     implementation(libs.material)
-    // api(libs.glutils)
-    // testImplementation(libs.khronos)
     testImplementation(libs.junit)
     testImplementation(libs.mockk.android)
     testImplementation(libs.robolectric)
