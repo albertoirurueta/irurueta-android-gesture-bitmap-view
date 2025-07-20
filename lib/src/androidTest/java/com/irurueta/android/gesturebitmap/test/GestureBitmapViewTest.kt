@@ -1310,6 +1310,7 @@ class GestureBitmapViewTest {
         assertEquals(1.0, view.transformationParameters.scale, 0.0)
     }
 
+    @RequiresDevice
     @Test
     fun rotateGesture_modifiesRotationAngle() {
         val view = this.view ?: return fail()
