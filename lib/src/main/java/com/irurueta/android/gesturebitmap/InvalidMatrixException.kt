@@ -19,5 +19,4 @@ package com.irurueta.android.gesturebitmap
 /**
  * Raised if provided matrix does not represent a valid metric transformation.
  */
-class InvalidMatrixException : RuntimeException() {
-}
+class InvalidMatrixException : RuntimeException()

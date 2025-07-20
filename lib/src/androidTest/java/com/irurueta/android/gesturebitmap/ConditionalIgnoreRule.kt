@@ -185,7 +185,7 @@ class ConditionalIgnoreRule : MethodRule {
          */
         private fun createCondition(): IgnoreCondition? {
             return if (isConditionTypeStandalone) {
-                conditionType?.java?.newInstance()
+                conditionType?.java?.getDeclaredConstructor()?.newInstance()
             } else {
                 conditionType?.java?.getDeclaredConstructor(target?.javaClass)
                     ?.newInstance(target)

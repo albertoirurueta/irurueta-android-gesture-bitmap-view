@@ -965,7 +965,7 @@ class GestureBitmapViewTest {
     @Test
     fun saveRestore_restoresViewTransformationParameters() {
         var view = this.view ?: return fail()
-        var activity = this.activity ?: return fail()
+        val activity = this.activity ?: return fail()
 
         // change parameters
         UiThreadStatement.runOnUiThread {

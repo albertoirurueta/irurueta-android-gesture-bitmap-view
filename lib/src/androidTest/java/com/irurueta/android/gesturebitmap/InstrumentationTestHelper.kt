@@ -94,7 +94,7 @@ object InstrumentationTestHelper {
         val stepX2 = (endX2 - startX2).toFloat() / numSteps
         val stepY2 = (endY2 - startY2).toFloat() / numSteps
 
-        for (i in 1..numSteps) {
+        (1..numSteps).forEach { i ->
             // update the move events
             eventTime += EVENT_MIN_INTERVAL
             eventX1 += stepX1
@@ -171,7 +171,7 @@ object InstrumentationTestHelper {
         inst.sendPointerSync(event)
         inst.waitForIdleSync()
 
-        for (i in 1..stepCount) {
+        (1..stepCount).forEach { i ->
             x += xStep
             y += yStep
             eventTime = SystemClock.uptimeMillis()
