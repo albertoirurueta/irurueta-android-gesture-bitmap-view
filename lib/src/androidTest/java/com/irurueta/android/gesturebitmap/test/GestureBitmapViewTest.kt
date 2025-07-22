@@ -1,17 +1,17 @@
 package com.irurueta.android.gesturebitmap.test
 
+import android.content.Intent
 import android.graphics.Matrix
 import android.os.Bundle
+import androidx.test.core.app.launchActivity
 import androidx.test.ext.junit.rules.activityScenarioRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.filters.RequiresDevice
 import androidx.test.internal.runner.junit4.statement.UiThreadStatement
 import androidx.test.platform.app.InstrumentationRegistry
 import com.irurueta.android.gesturebitmap.*
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -21,7 +21,10 @@ import kotlin.math.ceil
 class GestureBitmapViewTest {
 
     @get:Rule
-    val rule = activityScenarioRule<GestureBitmapViewActivity>()
+    val activityScenarioRule = activityScenarioRule<GestureBitmapViewActivity>()
+
+    @get:Rule
+    val conditionalIgnoreRule = ConditionalIgnoreRule()
 
     private var activity: GestureBitmapViewActivity? = null
     private var view: GestureBitmapView? = null
@@ -135,7 +138,7 @@ class GestureBitmapViewTest {
 
     @Before
     fun setUp() {
-        rule.scenario.onActivity { activity ->
+        activityScenarioRule.scenario.onActivity { activity ->
             this.activity = activity
             view = activity?.findViewById(R.id.gesture_bitmap_view_test)
             reset()
@@ -349,7 +352,6 @@ class GestureBitmapViewTest {
         )
     }
 
-    @Ignore("fails on CI")
     @Test
     fun displayType_whenFitXTop_keepsDisplayTransformationAndUpdatesOtherTransformations() {
         val view = this.view ?: return fail()
@@ -374,7 +376,22 @@ class GestureBitmapViewTest {
 
         assertNotEquals(baseTransformation1, baseTransformation2)
         assertNotEquals(transformation1, transformation2)
-        assertEquals(displayTransformation1, displayTransformation2)
+        assertEquals(
+            displayTransformation1.scale,
+            displayTransformation2.scale, ABSOLUTE_ERROR
+        )
+        assertEquals(
+            displayTransformation1.rotationAngle,
+            displayTransformation2.rotationAngle, 0.0
+        )
+        assertEquals(
+            displayTransformation1.horizontalTranslation,
+            displayTransformation2.horizontalTranslation, 0.0
+        )
+        assertEquals(
+            displayTransformation1.verticalTranslation,
+            displayTransformation2.verticalTranslation, 0.0
+        )
     }
 
     @Test
@@ -961,11 +978,10 @@ class GestureBitmapViewTest {
         assertNotEquals(identity, view.displayTransformationMatrix)
     }
 
-    @Ignore("fails on CI")
     @Test
     fun saveRestore_restoresViewTransformationParameters() {
         var view = this.view ?: return fail()
-        val activity = this.activity ?: return fail()
+        var activity = this.activity ?: return fail()
 
         // change parameters
         UiThreadStatement.runOnUiThread {
@@ -998,20 +1014,20 @@ class GestureBitmapViewTest {
         activity.finish()
 
         // restore state
-        rule.scenario.recreate()
-        /*val intent = Intent(
+        val intent = Intent(
             InstrumentationRegistry.getInstrumentation().context,
             GestureBitmapViewActivity::class.java
         )
-        launchActivity<GestureBitmapViewActivity>().use { scenario ->
+        launchActivity<GestureBitmapViewActivity>(intent).use { scenario ->
             scenario.onActivity { activity ->
-                startActivity(intent, )
+                this.activity = activity
+                this.view = activity?.findViewById(R.id.gesture_bitmap_view_test)
+                reset()
             }
         }
-        activity = activityRule.launchActivity(intent)*/
-        this.activity = activity
-        view = activity.findViewById(R.id.gesture_bitmap_view_test)
-        this.view = view
+
+        activity = this.activity ?: return fail()
+        view = this.view ?: return fail()
 
         // when activity has been launched, parameters have not been restored yet
         val identity = Matrix()
@@ -1043,7 +1059,7 @@ class GestureBitmapViewTest {
         assertEquals(53.0f, view.bottomScrollMargin, 0.0f)
     }
 
-    @RequiresDevice
+    @RequiresRealDevice
     @Test
     fun doubleTapGesture_modifiesScaleAndNotifies() {
         val view = this.view ?: return fail()
@@ -1117,7 +1133,7 @@ class GestureBitmapViewTest {
         assertEquals(1, rotationAndTranslateAnimationCompleted)
     }
 
-    @RequiresDevice
+    @RequiresRealDevice
     @Test
     fun scrollAndFlingGestures_whenReachesBounds_notifies() {
         val view = this.view ?: return fail()
@@ -1310,7 +1326,7 @@ class GestureBitmapViewTest {
         assertEquals(1.0, view.transformationParameters.scale, 0.0)
     }
 
-    @RequiresDevice
+    @RequiresRealDevice
     @Test
     fun rotateGesture_modifiesRotationAngle() {
         val view = this.view ?: return fail()

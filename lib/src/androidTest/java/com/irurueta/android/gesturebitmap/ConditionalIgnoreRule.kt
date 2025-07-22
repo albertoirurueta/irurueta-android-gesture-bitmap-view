@@ -10,22 +10,23 @@ import java.lang.reflect.Modifier
 
 /**
  * Rule to be used to ignore certain tests under certain conditions based on test
- * methods annotated with [ConditionalIgnore] or [RequiresEmulator].
+ * methods annotated with [ConditionalIgnore], [RequiresEmulator] or [RequiresRealDevice].
  */
 class ConditionalIgnoreRule : MethodRule {
 
     /**
      * Modifies [Statement] to be executed by a [Test] method.
      * This method is used to detect whether a given test method is annotated with
-     * [ConditionalIgnore] or [RequiresEmulator], and if so a new [Statement] is
-     * returned that will ignore the execution of the test.
+     * [ConditionalIgnore], [RequiresEmulator] or [RequiresRealDevice], and if so a new [Statement]
+     * is returned that will ignore the execution of the test.
      *
      * @param base base statement provided by other rules, if any other rule is also used on the
      * same test suite.
      * @param method test method to be executed where rule is applied.
      * @param target the test suite instance where the method will be run.
      * @return provided base [Statement] if no annotation is detected, or a new [IgnoreStatement]
-     * if either [ConditionalIgnore] or [RequiresEmulator] annotation is found.
+     * if either [ConditionalIgnore] , [RequiresEmulator] or [RequiresRealDevice] annotation is
+     * found.
      */
     override fun apply(base: Statement?, method: FrameworkMethod?, target: Any?): Statement? {
         var result = base
@@ -36,6 +37,11 @@ class ConditionalIgnoreRule : MethodRule {
             }
         } else if (hasRequiresEmulatorAnnotation(method)) {
             val condition = NotRunningOnEmulator()
+            if (condition.isSatisfied) {
+                result = IgnoreStatement(condition)
+            }
+        } else if (hasRequiresRealDeviceAnnotation(method)) {
+            val condition = NotRunningOnRealDevice()
             if (condition.isSatisfied) {
                 result = IgnoreStatement(condition)
             }
@@ -78,6 +84,10 @@ class ConditionalIgnoreRule : MethodRule {
             return method?.getAnnotation(RequiresEmulator::class.java) != null
         }
 
+        fun hasRequiresRealDeviceAnnotation(method: FrameworkMethod?): Boolean {
+            return method?.getAnnotation(RequiresRealDevice::class.java) != null
+        }
+
         /**
          * Indicates whether the test application is being executed on an android emulator.
          *
@@ -85,7 +95,11 @@ class ConditionalIgnoreRule : MethodRule {
          * false otherwise.
          */
         fun isEmulator(): Boolean {
-            return (Build.BRAND.startsWith("generic") && Build.DEVICE.startsWith("generic")
+            return Build.HARDWARE.equals("goldfish") ||
+                    Build.HARDWARE.equals("ranchu") ||
+                    Build.HARDWARE.equals("gce_x86")
+
+            /*return (Build.BRAND.startsWith("generic") && Build.DEVICE.startsWith("generic")
                     || Build.FINGERPRINT.startsWith("generic")
                     || Build.FINGERPRINT.startsWith("unknown")
                     || Build.HARDWARE.contains("goldfish")
@@ -101,7 +115,7 @@ class ConditionalIgnoreRule : MethodRule {
                     || Build.PRODUCT.contains("sdk_gphone64_arm64")
                     || Build.PRODUCT.contains("vbox86p")
                     || Build.PRODUCT.contains("emulator")
-                    || Build.PRODUCT.contains("simulator"))
+                    || Build.PRODUCT.contains("simulator"))*/
         }
     }
 
@@ -226,5 +240,19 @@ class ConditionalIgnoreRule : MethodRule {
          */
         override val isSatisfied: Boolean
             get() = !isEmulator()
+    }
+
+    class NotRunningOnRealDevice : IgnoreCondition {
+        /**
+         * Indicates whether ignore condition is satisfied or not.
+         * When ignore condition is satisfied on an annotated test method, such
+         * method is ignored.
+         * This implementation is satisfied if test method is not executed on a real Android device.
+         *
+         * @return true if test method is not executed on a real Android device,
+         * false otherwise.
+         */
+        override val isSatisfied: Boolean
+            get() = isEmulator()
     }
 }
