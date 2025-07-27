@@ -17,15 +17,25 @@
 package com.irurueta.android.gesturebitmap
 
 import android.view.MotionEvent
+import com.irurueta.android.testutils.getPrivateProperty
+import io.mockk.clearAllMocks
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.unmockkAll
 import io.mockk.verify
+import org.junit.After
 import org.junit.Assert.*
 import org.junit.Test
 import kotlin.math.atan2
 import kotlin.random.Random
 
 class RotationGestureDetectorTest {
+
+    @After
+    fun afterTest() {
+        clearAllMocks()
+        unmockkAll()
+    }
 
     @Test
     fun constructor_whenNoListener_setsExpectedValues() {

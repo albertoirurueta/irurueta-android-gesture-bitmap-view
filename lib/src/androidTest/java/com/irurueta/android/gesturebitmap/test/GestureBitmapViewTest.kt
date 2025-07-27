@@ -9,6 +9,9 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.internal.runner.junit4.statement.UiThreadStatement
 import androidx.test.platform.app.InstrumentationRegistry
 import com.irurueta.android.gesturebitmap.*
+import com.irurueta.android.testutils.ConditionalIgnoreRule
+import com.irurueta.android.testutils.InstrumentationTestHelper
+import com.irurueta.android.testutils.RequiresRealDevice
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before

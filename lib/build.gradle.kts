@@ -107,11 +107,13 @@ dependencies {
     testImplementation(libs.androidx.test.core.ktx)
     testImplementation(libs.kotlin.reflect)
     testImplementation(libs.irurueta.geometry)
+    testImplementation(libs.irurueta.test.utils)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.test.core.ktx)
     androidTestImplementation(libs.androidx.test.ext.junit.ktx)
     androidTestImplementation(libs.mockk.android)
+    androidTestImplementation(libs.irurueta.test.utils)
 }
 
 mavenPublishing {

@@ -31,6 +31,10 @@ import android.view.*
 import androidx.core.graphics.drawable.toBitmap
 import androidx.core.os.BundleCompat
 import androidx.test.core.app.ApplicationProvider
+import com.irurueta.android.testutils.callPrivateFunc
+import com.irurueta.android.testutils.callPrivateFuncWithResult
+import com.irurueta.android.testutils.getPrivateProperty
+import com.irurueta.android.testutils.setPrivateProperty
 import com.irurueta.statistics.UniformRandomizer
 import io.mockk.*
 import io.mockk.impl.annotations.MockK
