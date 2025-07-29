@@ -35,7 +35,7 @@ and rotate displayed bitmap.
 Add the following dependency to your project:
 
 ```
-implementation 'com.irurueta:irurueta-android-gesture-bitmap-view:1.2.3'
+implementation 'com.irurueta:irurueta-android-gesture-bitmap-view:1.2.4'
 ```
 
 The view can be added to your xml layout as the example below:
