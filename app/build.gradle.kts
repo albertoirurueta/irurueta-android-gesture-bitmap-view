@@ -16,10 +16,10 @@ android {
 
     defaultConfig {
         applicationId = "com.irurueta.android.gesturebitmap.app"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 36
         versionCode = 7
-        versionName = "1.2.5"
+        versionName = "1.2.6"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

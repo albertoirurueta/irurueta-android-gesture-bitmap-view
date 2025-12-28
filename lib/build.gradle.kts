@@ -9,14 +9,14 @@ plugins {
     alias(libs.plugins.publish)
 }
 
-val libraryVersion = "1.2.5"
+val libraryVersion = "1.2.6"
 
 android {
     namespace = "com.irurueta.android.gesturebitmap"
     compileSdk = 36
 
     defaultConfig {
-        minSdk = 24
+        minSdk = 26
         testOptions.targetSdk = 36
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
