@@ -22,6 +22,7 @@ import android.content.res.TypedArray
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Matrix
+import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.os.Looper
@@ -1633,6 +1634,66 @@ class GestureBitmapViewTest {
         // check
         assertSame(bitmap, view.bitmap)
         verify(exactly = 1) { drawable.toBitmap(320, 240) }
+    }
+
+    @Test
+    fun setDrawable_whenBitmapDrawableIsScaledUpByDensity_usesActualBitmapSize() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val view = GestureBitmapView(context)
+
+        every { bitmap.isRecycled }.returns(false)
+        every { bitmap.width }.returns(320)
+        every { bitmap.height }.returns(240)
+
+        // intrinsic size is larger than actual bitmap size (density scaling)
+        val drawable = mockk<BitmapDrawable>()
+        every { drawable.bitmap }.returns(bitmap)
+        every { drawable.intrinsicWidth }.returns(840)
+        every { drawable.intrinsicHeight }.returns(630)
+
+        mockkStatic("androidx.core.graphics.drawable.DrawableKt")
+        every { drawable.toBitmap(any(), any(), any()) }.returns(bitmap)
+
+        view.setDrawable(drawable)
+
+        // bitmap is not scaled up
+        assertSame(bitmap, view.bitmap)
+        verify(exactly = 1) { drawable.toBitmap(320, 240) }
+        verify(exactly = 0) { drawable.toBitmap(840, 630) }
+    }
+
+    @Test
+    fun setDrawable_whenBitmapDrawableIsNotScaledUp_usesIntrinsicSize() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val view = GestureBitmapView(context)
+
+        every { bitmap.isRecycled }.returns(false)
+        every { bitmap.width }.returns(640)
+        every { bitmap.height }.returns(480)
+
+        // intrinsic size is smaller than actual bitmap size
+        val drawable = mockk<BitmapDrawable>()
+        every { drawable.bitmap }.returns(bitmap)
+        every { drawable.intrinsicWidth }.returns(320)
+        every { drawable.intrinsicHeight }.returns(240)
+
+        mockkStatic("androidx.core.graphics.drawable.DrawableKt")
+        every { drawable.toBitmap(any(), any(), any()) }.returns(bitmap)
+
+        view.setDrawable(drawable)
+
+        assertSame(bitmap, view.bitmap)
+        verify(exactly = 1) { drawable.toBitmap(320, 240) }
+    }
+
+    @Test
+    fun setDrawable_whenNull_setsNoBitmap() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val view = GestureBitmapView(context)
+
+        view.setDrawable(null)
+
+        assertNull(view.bitmap)
     }
 
     @Test

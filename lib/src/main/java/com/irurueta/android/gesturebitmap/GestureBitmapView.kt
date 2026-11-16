@@ -27,6 +27,7 @@ import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.PointF
 import android.graphics.RectF
+import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.os.Parcelable
@@ -281,12 +282,42 @@ class GestureBitmapView @JvmOverloads constructor(
     }
 
     /**
-     * Sets bitmap of this view using provided drawable intrinsic size.
+     * Sets bitmap of this view using provided drawable.
+     *
+     * The drawable is converted to a bitmap of its intrinsic size, except for bitmap drawables
+     * whose intrinsic size is larger than their actual bitmap (e.g. a resource placed in a
+     * `drawable` folder of lower density than the screen). Those are never scaled up: their
+     * bitmap is used at its own size, because a scaled up copy needs much more memory, can
+     * exceed the maximum size the GPU is able to keep as a texture and makes drawing every
+     * frame very slow, without adding any detail.
      *
      * @param drawable drawable to be set.
      */
     fun setDrawable(drawable: Drawable?) {
-        bitmap = drawable?.toBitmap()
+        bitmap = toBitmapWithoutUpscaling(drawable)
+    }
+
+    /**
+     * Converts provided drawable into a bitmap, without scaling up bitmap drawables beyond the
+     * size of their actual bitmap.
+     *
+     * @param drawable drawable to be converted.
+     * @return converted bitmap or null if no drawable is provided.
+     */
+    private fun toBitmapWithoutUpscaling(drawable: Drawable?): Bitmap? {
+        if (drawable == null) {
+            return null
+        }
+
+        val source = (drawable as? BitmapDrawable)?.bitmap
+        return if (source != null
+            && (drawable.intrinsicWidth > source.width || drawable.intrinsicHeight > source.height)
+        ) {
+            // intrinsic size is scaled by screen density, use actual bitmap size instead
+            drawable.toBitmap(source.width, source.height)
+        } else {
+            drawable.toBitmap()
+        }
     }
 
     /**

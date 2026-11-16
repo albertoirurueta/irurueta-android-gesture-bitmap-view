@@ -24,6 +24,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `RotationGestureDetector` ignores fingers beyond the second one, and restarts tracking with the remaining fingers
   when a tracked finger is lifted. `ACTION_UP` now clears both tracked fingers.
 - Sample app image moved to `drawable-nodpi` so that it is not scaled up by screen density.
+- `setDrawable` and the `src` attribute no longer scale bitmap drawables up by screen density: the actual bitmap size
+  is used. With `DisplayType.NONE` or `FIT_IF_BIGGER`, such images are now displayed at their pixel size instead of
+  their density-scaled size.
 - Builds now run on JDK 21, required by the SonarCloud scanner. The library is still compiled for JVM target 17.
 - When a zoom animation that does not end at the minimum scale finishes (double tap, return from over-zoom), the
   bitmap is animated back within its scroll limits if needed.
@@ -32,6 +35,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Very slow frames (around 100 ms on a Pixel 7a) when a large image was loaded from a density-scaled `drawable`
+  folder, caused by the bitmap being scaled up by screen density.
 - Bitmap not returning within its scroll limits when released after the first drag.
 - Wrong coordinate used to decide whether the bitmap fits horizontally when limiting scroll.
 - Scale and translation limits not being restored when a gesture is cancelled.
