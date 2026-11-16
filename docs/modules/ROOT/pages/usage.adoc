@@ -56,7 +56,7 @@ view.bitmap = bitmap
 // Same, with explicit control over resetting the transformation
 view.setBitmap(otherBitmap, resetMatrices = false)
 
-// From a Drawable, converted to a bitmap of its intrinsic size
+// From a Drawable, converted to a bitmap (never scaled up by screen density)
 view.setDrawable(drawable)
 ----
 
@@ -65,16 +65,20 @@ view.setDrawable(drawable)
 * `setBitmap(bitmap, resetMatrices = false)` keeps the current base and gesture transformations, which is useful to
   replace the image with another one of the same size (for instance a processed version) without losing the current
   zoom and position.
-* `setDrawable(drawable)` converts the drawable with `Drawable.toBitmap()` and assigns it to `bitmap`.
+* `setDrawable(drawable)` (also used by the `app:src` attribute) converts the drawable with `Drawable.toBitmap()` and
+  assigns it to `bitmap`. The drawable's intrinsic size is used, except for bitmap drawables whose intrinsic size is
+  larger than their actual bitmap because of screen density: those keep the size of their actual bitmap and are never
+  scaled up.
 
 WARNING: Setting a new bitmap calls `recycle()` on the bitmap previously held by the view. Do not set a bitmap you
 still need elsewhere, and do not reuse a bitmap after it has been replaced. A recycled bitmap is ignored when set.
 
 TIP: The view draws the whole bitmap on every frame, so very large bitmaps make gestures less fluid. Decode bitmaps at
-a size close to what will actually be displayed (view size multiplied by `maxScale` at most). Drawable resources
-placed in a density-less folder such as `drawable/` are treated as `mdpi` and get scaled up on denser screens; put
-large photos in `drawable-nodpi/` instead. The view enables mipmaps on the bitmap it is given
-(`Bitmap.setHasMipMap(true)`) to make drawing at reduced sizes cheaper.
+a size close to what will actually be displayed (view size multiplied by `maxScale` at most). Oversized bitmaps
+can be dramatically slower: on a Pixel 7a, a 4032x3024 photo scaled up by density to about 10584x7938 took around
+100 ms per frame (every frame reported a slow bitmap upload), against 7 ms at its own size. `setDrawable` and `app:src`
+avoid that scaling for bitmap drawables, but a bitmap you decode and assign yourself is used as it is. The view
+enables mipmaps on the bitmap it is given (`Bitmap.setHasMipMap(true)`) to make drawing at reduced sizes cheaper.
 
 == Choosing a display type
 

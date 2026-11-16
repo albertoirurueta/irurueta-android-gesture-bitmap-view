@@ -27,6 +27,7 @@ import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.PointF
 import android.graphics.RectF
+import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.os.Parcelable
@@ -39,6 +40,7 @@ import android.view.animation.DecelerateInterpolator
 import androidx.core.content.withStyledAttributes
 import androidx.core.graphics.drawable.toBitmap
 import androidx.core.os.BundleCompat
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
@@ -124,6 +126,12 @@ class GestureBitmapView @JvmOverloads constructor(
      * limit computation.
      */
     private var bitmapDisplayedRect = RectF()
+
+    /**
+     * Indicates whether any gesture has changed the transformation since current touch
+     * sequence started.
+     */
+    private var transformationChangedByGesture = false
 
     /**
      * Paint used for drawing bitmaps with antialiasing.
@@ -267,18 +275,49 @@ class GestureBitmapView @JvmOverloads constructor(
                 resetTransformationParameters()
             } else {
                 cancelAllAnimators()
-                invalidate()
+                // this method can be called from any thread
+                postInvalidate()
             }
         }
     }
 
     /**
-     * Sets bitmap of this view using provided drawable intrinsic size.
+     * Sets bitmap of this view using provided drawable.
+     *
+     * The drawable is converted to a bitmap of its intrinsic size, except for bitmap drawables
+     * whose intrinsic size is larger than their actual bitmap (e.g. a resource placed in a
+     * `drawable` folder of lower density than the screen). Those are never scaled up: their
+     * bitmap is used at its own size, because a scaled up copy needs much more memory, can
+     * exceed the maximum size the GPU is able to keep as a texture and makes drawing every
+     * frame very slow, without adding any detail.
      *
      * @param drawable drawable to be set.
      */
     fun setDrawable(drawable: Drawable?) {
-        bitmap = drawable?.toBitmap()
+        bitmap = toBitmapWithoutUpscaling(drawable)
+    }
+
+    /**
+     * Converts provided drawable into a bitmap, without scaling up bitmap drawables beyond the
+     * size of their actual bitmap.
+     *
+     * @param drawable drawable to be converted.
+     * @return converted bitmap or null if no drawable is provided.
+     */
+    private fun toBitmapWithoutUpscaling(drawable: Drawable?): Bitmap? {
+        if (drawable == null) {
+            return null
+        }
+
+        val source = (drawable as? BitmapDrawable)?.bitmap
+        return if (source != null
+            && (drawable.intrinsicWidth > source.width || drawable.intrinsicHeight > source.height)
+        ) {
+            // intrinsic size is scaled by screen density, use actual bitmap size instead
+            drawable.toBitmap(source.width, source.height)
+        } else {
+            drawable.toBitmap()
+        }
     }
 
     /**
@@ -319,7 +358,8 @@ class GestureBitmapView @JvmOverloads constructor(
                 paramsMatrix.preConcat(invBaseMatrix)
 
                 updateDisplayMatrix()
-                invalidate()
+                // this setter can be called from any thread
+                postInvalidate()
             }
         }
 
@@ -445,7 +485,8 @@ class GestureBitmapView @JvmOverloads constructor(
         cancelAllAnimators()
         paramsMatrix.reset()
         updateDisplayMatrix()
-        invalidate()
+        // this method can be called from any thread
+        postInvalidate()
     }
 
     /**
@@ -464,7 +505,8 @@ class GestureBitmapView @JvmOverloads constructor(
             cancelAllAnimators()
             setTransformationParameters(value, paramsMatrix)
             updateDisplayMatrix()
-            invalidate()
+            // this setter can be called from any thread
+            postInvalidate()
         }
 
     /**
@@ -541,8 +583,10 @@ class GestureBitmapView @JvmOverloads constructor(
         action = action and MotionEvent.ACTION_MASK
         if (action == MotionEvent.ACTION_DOWN) {
             cancelAllAnimators()
-        } else if (action == MotionEvent.ACTION_POINTER_DOWN) {
-            // a multi-touch gesture has started, prevent scrolling parents from stealing it
+            transformationChangedByGesture = false
+        } else if (action == MotionEvent.ACTION_POINTER_DOWN && isAnyMultiTouchGestureEnabled()) {
+            // a multi-touch gesture handled by this view has started, prevent scrolling parents
+            // from stealing it
             parent?.requestDisallowInterceptTouchEvent(true)
         }
 
@@ -565,11 +609,17 @@ class GestureBitmapView @JvmOverloads constructor(
         }
 
         if (gestureHandled || scaleHandled || rotationHandled) {
-            updateDisplayMatrix()
+            // display matrix is already updated by whichever gesture changed the transformation
+            transformationChangedByGesture = true
             invalidate()
         }
 
-        if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+        if ((action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL)
+            && transformationChangedByGesture
+        ) {
+            // limits are only restored when a gesture has changed the transformation, so that
+            // transformations set programmatically are preserved by plain taps
+            transformationChangedByGesture = false
             limitScaleAndTranslation()
         }
 
@@ -709,6 +759,15 @@ class GestureBitmapView @JvmOverloads constructor(
     }
 
     /**
+     * Indicates whether any gesture requiring more than one finger is enabled.
+     *
+     * @return true if scale, rotation or two finger scroll is enabled, false otherwise.
+     */
+    private fun isAnyMultiTouchGestureEnabled(): Boolean {
+        return scaleEnabled || rotationEnabled || (scrollEnabled && twoFingerScrollEnabled)
+    }
+
+    /**
      * Called when a touch gesture finishes to smoothly return scale and translation to their
      * allowed limits.
      */
@@ -767,9 +826,6 @@ class GestureBitmapView @JvmOverloads constructor(
         val tx = (oldTx + scrollDiff.x).toFloat()
         val ty = (oldTy + scrollDiff.y).toFloat()
         updateTranslation(tx, ty, false)
-
-        // keep display matrix up to date, since scroll limits are computed from it
-        updateDisplayMatrix()
     }
 
     /**
@@ -796,7 +852,10 @@ class GestureBitmapView @JvmOverloads constructor(
             scrollDiff
         )
 
-        if (skipIfNotNeeded && scrollDiff.x == 0.0f && scrollDiff.y == 0.0f) {
+        if (skipIfNotNeeded && abs(scrollDiff.x) < MIN_SCROLL_CORRECTION
+            && abs(scrollDiff.y) < MIN_SCROLL_CORRECTION
+        ) {
+            // required correction is not noticeable
             return
         }
 
@@ -834,10 +893,10 @@ class GestureBitmapView @JvmOverloads constructor(
         snap: Boolean,
         result: PointF
     ) {
-        result.x = dx
-        result.y = dy
-
         if (!currentBitmapDisplayedRect(displayMatrix, bitmapDisplayedRect)) {
+            // there is nothing to scroll when no bitmap is available
+            result.x = 0.0f
+            result.y = 0.0f
             return
         }
 
@@ -1001,8 +1060,9 @@ class GestureBitmapView @JvmOverloads constructor(
         parameters.verticalTranslation = ty.toDouble()
 
         setTransformationParameters(parameters, paramsMatrix)
+        // display matrix is always kept up to date, since scroll limits are computed from it
+        updateDisplayMatrix()
         if (invalidate) {
-            updateDisplayMatrix()
             invalidate()
         }
     }
@@ -1125,8 +1185,9 @@ class GestureBitmapView @JvmOverloads constructor(
         parameters.verticalTranslation = verticalTranslation
 
         setTransformationParameters(parameters, paramsMatrix)
+        // display matrix is always kept up to date, since scroll limits are computed from it
+        updateDisplayMatrix()
         if (invalidate) {
-            updateDisplayMatrix()
             invalidate()
         }
     }
@@ -1366,88 +1427,103 @@ class GestureBitmapView @JvmOverloads constructor(
 
     /**
      * Scales up to provided scale using an animation and provided pivot point.
-     * If no pivot point coordinates are provided, then view center is used.
      * When provided scale is the minimum scale (or lower), rotation and translation are animated
-     * back to their initial values within the same animation.
+     * back to their initial values within the same animation (see [smoothResetTo]).
+     * Otherwise, when animation finishes, bitmap is smoothly returned within its scroll limits
+     * if needed.
      *
      * @param scale scale to animate to.
      * @param pivotX horizontal coordinate of pivot point.
      * @param pivotY vertical coordinate of pivot point.
      */
     private fun smoothScaleTo(scale: Float, pivotX: Float, pivotY: Float) {
+        if (scale <= minScale) {
+            smoothResetTo(scale)
+            return
+        }
+
         cancelAllAnimators()
 
         getTransformationParameters(paramsMatrix, parameters)
         val initialScale = parameters.scale.toFloat()
 
-        // when minimum scale is reached, view returns to initial translation and rotation.
-        // This is done within the same animation to obtain a single continuous movement.
-        val resetRotationAndTranslation = scale <= minScale
-
-        val scaleAnimator = if (resetRotationAndTranslation) {
-            val initValues = floatArrayOf(
-                initialScale,
-                parameters.rotationAngle.toFloat(),
-                parameters.horizontalTranslation.toFloat(),
-                parameters.verticalTranslation.toFloat()
-            )
-            val endValues = floatArrayOf(scale, 0.0f, 0.0f, 0.0f)
-            ValueAnimator.ofObject(FloatArrayEvaluator(), initValues, endValues)
-        } else {
-            ValueAnimator.ofFloat(initialScale, scale)
-        }
-        this.scaleAnimator = scaleAnimator
-
-        scaleAnimator.setTarget(this)
+        val scaleAnimator = ValueAnimator.ofFloat(initialScale, scale)
         scaleAnimator.addUpdateListener { animator ->
-            if (resetRotationAndTranslation) {
-                val value = animator.animatedValue as FloatArray
-                updateAllParameters(value[0], value[1], value[2], value[3])
-            } else {
-                val s = animator.animatedValue as Float
-                updateScale(s.toDouble(), pivotX, pivotY, invalidate = true)
+            val s = animator.animatedValue as Float
+            updateScale(s.toDouble(), pivotX, pivotY, invalidate = true)
+        }
+
+        startScaleAnimator(scaleAnimator) { cancelled ->
+            if (!cancelled) {
+                updateScale(scale.toDouble(), pivotX, pivotY, invalidate = true)
+            }
+            notifyScaleAnimationCompleted()
+
+            if (!cancelled) {
+                // scaling around a pivot can leave the bitmap beyond its scroll limits
+                smoothScrollBy(0.0f, 0.0f, skipIfNotNeeded = true)
             }
         }
-        scaleAnimator.duration = animationDurationMillis
-        scaleAnimator.interpolator = DecelerateInterpolator()
+    }
 
-        scaleAnimator.addListener(object : Animator.AnimatorListener {
+    /**
+     * Animates scale up to provided value while rotation and translation are animated back to
+     * their initial values, so that a single continuous movement is obtained.
+     * This is used when view returns to its minimum scale.
+     *
+     * @param scale scale to animate to.
+     */
+    private fun smoothResetTo(scale: Float) {
+        cancelAllAnimators()
+
+        getTransformationParameters(paramsMatrix, parameters)
+        val initValues = floatArrayOf(
+            parameters.scale.toFloat(),
+            parameters.rotationAngle.toFloat(),
+            parameters.horizontalTranslation.toFloat(),
+            parameters.verticalTranslation.toFloat()
+        )
+        val endValues = floatArrayOf(scale, 0.0f, 0.0f, 0.0f)
+
+        val scaleAnimator = ValueAnimator.ofObject(FloatArrayEvaluator(), initValues, endValues)
+        scaleAnimator.addUpdateListener { animator ->
+            val value = animator.animatedValue as FloatArray
+            updateAllParameters(value[0], value[1], value[2], value[3])
+        }
+
+        startScaleAnimator(scaleAnimator) { cancelled ->
+            if (!cancelled) {
+                updateAllParameters(scale, 0.0f, 0.0f, 0.0f)
+            }
+            notifyScaleAnimationCompleted()
+
+            if (!cancelled) {
+                // rotation and translation have also been animated
+                rotateAndTranslateAnimationCompletedListener
+                    ?.onRotateAndTranslateAnimationCompleted(this)
+            }
+        }
+    }
+
+    /**
+     * Configures and starts provided animator as the scale animator of this view.
+     *
+     * @param animator animator to be started.
+     * @param onEnd called when animation ends, receiving true if animation was cancelled or
+     * false if it reached its end.
+     */
+    private fun startScaleAnimator(animator: ValueAnimator, onEnd: (cancelled: Boolean) -> Unit) {
+        this.scaleAnimator = animator
+
+        animator.setTarget(this)
+        animator.duration = animationDurationMillis
+        animator.interpolator = DecelerateInterpolator()
+
+        animator.addListener(object : Animator.AnimatorListener {
             var cancelled = false
 
             override fun onAnimationEnd(animation: Animator) {
-                if (!cancelled) {
-                    if (resetRotationAndTranslation) {
-                        updateAllParameters(scale, 0.0f, 0.0f, 0.0f)
-                    } else {
-                        updateScale(
-                            scale.toDouble(), pivotX, pivotY,
-                            invalidate = true
-                        )
-                    }
-                }
-
-                getTransformationParameters(paramsMatrix, parameters)
-                val currentScale = parameters.scale
-
-                if (currentScale <= minScale) {
-                    minScaleReachedListener?.onMinScaleReached(
-                        this@GestureBitmapView
-                    )
-                }
-                if (currentScale >= maxScale) {
-                    maxScaleReachedListener?.onMaxScaleReached(
-                        this@GestureBitmapView
-                    )
-                }
-                scaleAnimationCompletedListener?.onScaleAnimationCompleted(
-                    this@GestureBitmapView
-                )
-
-                if (resetRotationAndTranslation && !cancelled) {
-                    // rotation and translation have also been animated
-                    rotateAndTranslateAnimationCompletedListener
-                        ?.onRotateAndTranslateAnimationCompleted(this@GestureBitmapView)
-                }
+                onEnd(cancelled)
             }
 
             override fun onAnimationRepeat(animation: Animator) {
@@ -1463,7 +1539,23 @@ class GestureBitmapView @JvmOverloads constructor(
             }
         })
 
-        scaleAnimator.start()
+        animator.start()
+    }
+
+    /**
+     * Notifies listeners when a scale animation finishes.
+     */
+    private fun notifyScaleAnimationCompleted() {
+        getTransformationParameters(paramsMatrix, parameters)
+        val currentScale = parameters.scale
+
+        if (currentScale <= minScale) {
+            minScaleReachedListener?.onMinScaleReached(this)
+        }
+        if (currentScale >= maxScale) {
+            maxScaleReachedListener?.onMaxScaleReached(this)
+        }
+        scaleAnimationCompletedListener?.onScaleAnimationCompleted(this)
     }
 
     /**
@@ -2011,6 +2103,12 @@ class GestureBitmapView @JvmOverloads constructor(
          * Ratio between initial and average speed of the interpolator used to animate scroll.
          */
         private const val FLING_INITIAL_SPEED_FACTOR = 2.0f
+
+        /**
+         * Minimum scroll correction expressed in pixels that is worth animating when a gesture
+         * finishes.
+         */
+        private const val MIN_SCROLL_CORRECTION = 0.5f
 
         /**
          * Key to store state of parent class.

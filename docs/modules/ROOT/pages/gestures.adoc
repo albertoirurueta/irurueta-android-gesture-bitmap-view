@@ -52,7 +52,8 @@ Limits are computed from the area where the bitmap is currently displayed, so th
 made in the middle of a gesture. If a pinch or a rotation leaves the bitmap beyond its scroll limits, dragging never
 moves it more than the finger does: it can only be dragged back towards the limits, and the remaining excess is
 corrected by the animation that runs when the fingers are lifted (or the gesture is cancelled). No animation is started
-when the bitmap is already within its limits.
+when the bitmap is already within its limits, or when no gesture changed the transformation during the touch (a plain
+tap keeps a transformation set programmatically, even beyond the limits). Nothing is scrolled while no bitmap is set.
 
 === Fling
 

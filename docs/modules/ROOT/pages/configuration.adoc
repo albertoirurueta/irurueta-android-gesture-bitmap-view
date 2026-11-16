@@ -148,7 +148,7 @@ coordinates (base and gesture transformations combined).
 |Sets the bitmap, recycling the previous one. With `resetMatrices = false` the current transformation is kept.
 
 |`setDrawable(drawable: Drawable?)`
-|Sets the bitmap from a drawable at its intrinsic size.
+|Sets the bitmap from a drawable at its intrinsic size; bitmap drawables are never scaled up by screen density.
 
 |`resetTransformationParameters()`
 |Cancels animations and resets the gesture transformation, returning to the initial display.

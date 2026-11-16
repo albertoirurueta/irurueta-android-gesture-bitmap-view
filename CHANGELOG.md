@@ -9,8 +9,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
-- Redraws are requested with `invalidate()` instead of `postInvalidate()`, so that changes made by gestures and
-  animations are drawn without an additional frame of delay, and `onDraw` no longer allocates.
+- Redraws caused by gestures and animations are requested with `invalidate()` instead of `postInvalidate()`, so that
+  they are drawn without an additional frame of delay, and `onDraw` no longer allocates. Public setters keep using
+  `postInvalidate()` and can still be called from any thread.
 - Mipmaps are enabled on the bitmap set on the view, to make drawing at reduced sizes cheaper.
 - Scroll limits are computed from the area where the bitmap is currently displayed instead of the one at the start of
   the gesture. While dragging, a bitmap left beyond its limits by a pinch or a rotation is no longer snapped to them
@@ -22,16 +23,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - No animation is started when a gesture ends with the bitmap already within its limits.
 - `RotationGestureDetector` ignores fingers beyond the second one, and restarts tracking with the remaining fingers
   when a tracked finger is lifted. `ACTION_UP` now clears both tracked fingers.
-- The view asks its parent not to intercept touch events once a second finger touches the screen.
 - Sample app image moved to `drawable-nodpi` so that it is not scaled up by screen density.
+- `setDrawable` and the `src` attribute no longer scale bitmap drawables up by screen density: the actual bitmap size
+  is used. With `DisplayType.NONE` or `FIT_IF_BIGGER`, such images are now displayed at their pixel size instead of
+  their density-scaled size.
+- Builds now run on JDK 21, required by the SonarCloud scanner. The library is still compiled for JVM target 17.
+- When a zoom animation that does not end at the minimum scale finishes (double tap, return from over-zoom), the
+  bitmap is animated back within its scroll limits if needed.
+- The view asks its parent not to intercept touch events once a second finger touches the screen, when scale,
+  rotation or two-finger scroll is enabled.
 
 ### Fixed
 
+- Very slow frames (around 100 ms on a Pixel 7a) when a large image was loaded from a density-scaled `drawable`
+  folder, caused by the bitmap being scaled up by screen density.
 - Bitmap not returning within its scroll limits when released after the first drag.
 - Wrong coordinate used to decide whether the bitmap fits horizontally when limiting scroll.
 - Scale and translation limits not being restored when a gesture is cancelled.
 - Possible `IllegalArgumentException` and rotation jumps in `RotationGestureDetector` when the first finger is lifted
   before the second one or when more than two fingers are used.
+- A plain tap no longer moves back within scroll limits a transformation that was set programmatically.
+- Scroll and fling no longer change the transformation while no bitmap is set.
+- Unnoticeable (sub-pixel) corrections no longer start an animation when a gesture ends.
 
 ## [1.2.7] - 2026-03-07
 
