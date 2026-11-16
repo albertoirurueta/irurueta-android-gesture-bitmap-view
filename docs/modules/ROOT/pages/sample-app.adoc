@@ -29,7 +29,8 @@ on the xref:index.adoc[overview page] was recorded with it.
 </androidx.constraintlayout.widget.ConstraintLayout>
 ----
 
-The image comes from `app/src/main/res/drawable/image.jpeg` through `app:src`, so no Kotlin code is needed to set it.
+The image comes from `app/src/main/res/drawable-nodpi/image.jpeg` through `app:src`, so no Kotlin code is needed to
+set it. It lives in `drawable-nodpi` so that this large photo is not scaled up by screen density when loaded.
 
 == Activity
 

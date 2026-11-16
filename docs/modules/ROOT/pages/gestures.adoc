@@ -48,11 +48,17 @@ The bitmap can be dragged past its edges by up to `leftScrollMargin`, `topScroll
 axis keeps it near the center. When the finger is lifted, the bitmap animates back so that it no longer exceeds its
 limits, which produces a bounce effect. Set the margins to `0` to avoid any overshoot.
 
+Limits are computed from the area where the bitmap is currently displayed, so they follow scale and rotation changes
+made in the middle of a gesture. If a pinch or a rotation leaves the bitmap beyond its scroll limits, dragging never
+moves it more than the finger does: it can only be dragged back towards the limits, and the remaining excess is
+corrected by the animation that runs when the fingers are lifted (or the gesture is cancelled). No animation is started
+when the bitmap is already within its limits.
+
 === Fling
 
-A fling (fast swipe) follows the same `scrollEnabled`/two-finger rules as scroll. It produces an animated scroll whose
-distance is the fling velocity multiplied by `animationDurationMillis` (converted to seconds), still bounded by the
-scroll limits. `OnScrollAnimationCompletedListener` is notified when the animation ends.
+A fling (fast swipe) follows the same `scrollEnabled`/two-finger rules as scroll. It produces a decelerating animated
+scroll that starts at the velocity of the finger: its distance is half the fling velocity multiplied by
+`animationDurationMillis` (converted to seconds), still bounded by the scroll limits. `OnScrollAnimationCompletedListener` is notified when the animation ends.
 
 == Zoom (scale)
 
@@ -66,8 +72,9 @@ back to the nearest limit. At the end of that animation:
 * `OnMinScaleReachedListener` is notified if the scale is at or below `minScale`, and
   `OnMaxScaleReachedListener` if it is at or above `maxScale`;
 * `OnScaleAnimationCompletedListener` is notified;
-* if the scale is at or below `minScale`, rotation and translation are animated back to zero, so the bitmap returns to
-  its initial position, and `OnRotateAndTranslateAnimationCompletedListener` is notified when that finishes.
+* if the scale is at or below `minScale`, rotation and translation are animated back to zero within the same
+  animation, so the bitmap returns to its initial position in a single movement, and
+  `OnRotateAndTranslateAnimationCompletedListener` is also notified.
 
 `minScale` (default `1.0`) and `maxScale` (default `10.0`) are relative to the initial display defined by
 `displayType`: a scale of `1.0` means the bitmap is shown as initially fitted.
@@ -127,6 +134,13 @@ listener for those events and `false` otherwise. The detector also exposes the f
 (`initialAngle`, `currentAngle`, `deltaAngleStart`, `deltaAngle`) and the pivot (`pivotX`, `pivotY`). The `listener`
 property can be replaced at any time.
 
+Only two fingers are tracked. Additional fingers are ignored, and when one of the tracked fingers is lifted while
+others remain on the screen, tracking restarts with the remaining ones, so that no sudden rotation is reported.
+
+== Interaction with parent views
+
+When a second finger touches the view, it asks its parent not to intercept touch events (`requestDisallowInterceptTouchEvent(true)`), so that scrolling containers do not steal pinch and rotation gestures.
+
 == Single tap and long press
 
 A confirmed single tap calls `performClick()` and a long press calls `performLongClick()` (only when the view is
@@ -136,5 +150,5 @@ with the view.
 == Animations
 
 Double-tap zoom, the return within limits, flings and the reset after reaching the minimum scale are animated over
-`animationDurationMillis` (default `200` ms). Any running animation is cancelled when a new touch starts, when the
+`animationDurationMillis` (default `200` ms) with a decelerating movement. Any running animation is cancelled when a new touch starts, when the
 bitmap, `displayType` or view size changes, or when the transformation is set programmatically.

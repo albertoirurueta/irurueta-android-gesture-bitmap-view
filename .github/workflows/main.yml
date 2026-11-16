@@ -84,12 +84,14 @@ jobs:
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: lib/build/reports/lint-results-debug.sarif
+          category: android-lint-lib
 
       - name: Upload app lint SARIF results
         if: (!cancelled())
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: app/build/reports/lint-results-debug.sarif
+          category: android-lint-app
 
       - name: Run SonarCloud analysis
         env:

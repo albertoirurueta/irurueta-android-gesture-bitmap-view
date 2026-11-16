@@ -7,6 +7,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- Redraws are requested with `invalidate()` instead of `postInvalidate()`, so that changes made by gestures and
+  animations are drawn without an additional frame of delay, and `onDraw` no longer allocates.
+- Mipmaps are enabled on the bitmap set on the view, to make drawing at reduced sizes cheaper.
+- Scroll limits are computed from the area where the bitmap is currently displayed instead of the one at the start of
+  the gesture. While dragging, a bitmap left beyond its limits by a pinch or a rotation is no longer snapped to them
+  in a single step; the excess is corrected by the release animation.
+- Fling animation starts at the velocity of the finger (it previously started at twice that velocity), hence fling
+  distance is now half of what it used to be.
+- Scale animations decelerate instead of accelerating. When returning to the minimum scale, rotation and translation
+  are restored within the same animation instead of in a second one.
+- No animation is started when a gesture ends with the bitmap already within its limits.
+- `RotationGestureDetector` ignores fingers beyond the second one, and restarts tracking with the remaining fingers
+  when a tracked finger is lifted. `ACTION_UP` now clears both tracked fingers.
+- The view asks its parent not to intercept touch events once a second finger touches the screen.
+- Sample app image moved to `drawable-nodpi` so that it is not scaled up by screen density.
+
+### Fixed
+
+- Bitmap not returning within its scroll limits when released after the first drag.
+- Wrong coordinate used to decide whether the bitmap fits horizontally when limiting scroll.
+- Scale and translation limits not being restored when a gesture is cancelled.
+- Possible `IllegalArgumentException` and rotation jumps in `RotationGestureDetector` when the first finger is lifted
+  before the second one or when more than two fingers are used.
+
 ## [1.2.7] - 2026-03-07
 
 ### Changed

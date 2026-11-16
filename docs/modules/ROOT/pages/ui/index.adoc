@@ -12,7 +12,7 @@ sample application with a single screen that hosts the view full screen (see xre
 |Screen |Purpose |Entry point
 
 |`MainActivity` (sample app)
-|Displays `app/src/main/res/drawable/image.jpeg` in a full-screen `GestureBitmapView` with the default settings.
+|Displays `app/src/main/res/drawable-nodpi/image.jpeg` in a full-screen `GestureBitmapView` with the default settings.
 |Launcher activity of the `app` module.
 |===
 

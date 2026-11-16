@@ -18,6 +18,7 @@ package com.irurueta.android.gesturebitmap
 
 import android.view.MotionEvent
 import com.irurueta.android.testutils.getPrivateProperty
+import io.mockk.Called
 import io.mockk.clearAllMocks
 import io.mockk.every
 import io.mockk.mockk
@@ -449,7 +450,7 @@ class RotationGestureDetectorTest {
         assertEquals(INVALID_POINTER_ID, pointerId1)
 
         pointerId2 = detector.getPrivateProperty("pointerId2")
-        assertEquals(POINTER_ID_2, pointerId2)
+        assertEquals(INVALID_POINTER_ID, pointerId2)
     }
 
     @Test
@@ -491,6 +492,10 @@ class RotationGestureDetectorTest {
         // send 3rd event to raise 2nd pointer
         val event3 = mockk<MotionEvent>()
         every { event3.actionMasked }.returns(MotionEvent.ACTION_POINTER_UP)
+        every { event3.actionIndex }.returns(POINTER_INDEX_2)
+        every { event3.pointerCount }.returns(2)
+        every { event3.getPointerId(POINTER_INDEX_1) }.returns(POINTER_ID_1)
+        every { event3.getPointerId(POINTER_INDEX_2) }.returns(POINTER_ID_2)
 
         assertFalse(detector.onTouchEvent(event3))
 
@@ -550,12 +555,320 @@ class RotationGestureDetectorTest {
         assertEquals(INVALID_POINTER_ID, pointerId2)
     }
 
+    @Test
+    fun onTouchEvent_whenFirstPointerIsLifted_keepsRemainingPointerAndRestartsWithNewOne() {
+        val listener = mockk<RotationGestureDetector.OnRotationGestureListener>()
+        every { listener.onRotation(any(), any(), any(), any()) }.returns(true)
+        val detector = RotationGestureDetector(listener)
+
+        startTwoFingerGesture(detector)
+
+        // 1st pointer is lifted while 2nd one remains on screen
+        val event3 = mockk<MotionEvent>()
+        every { event3.actionMasked }.returns(MotionEvent.ACTION_POINTER_UP)
+        every { event3.actionIndex }.returns(POINTER_INDEX_1)
+        every { event3.pointerCount }.returns(2)
+        every { event3.getPointerId(POINTER_INDEX_1) }.returns(POINTER_ID_1)
+        every { event3.getPointerId(POINTER_INDEX_2) }.returns(POINTER_ID_2)
+
+        assertFalse(detector.onTouchEvent(event3))
+
+        // remaining pointer becomes the 1st one
+        var pointerId1: Int? = detector.getPrivateProperty("pointerId1")
+        assertEquals(POINTER_ID_2, pointerId1)
+        var pointerId2: Int? = detector.getPrivateProperty("pointerId2")
+        assertEquals(INVALID_POINTER_ID, pointerId2)
+
+        // moving with a single finger does not notify any rotation
+        val event4 = mockk<MotionEvent>()
+        every { event4.actionMasked }.returns(MotionEvent.ACTION_MOVE)
+        assertFalse(detector.onTouchEvent(event4))
+        verify(exactly = 0) { listener.onRotation(any(), any(), any(), any()) }
+
+        // a new finger touches the screen
+        val event5 = mockk<MotionEvent>()
+        every { event5.actionMasked }.returns(MotionEvent.ACTION_POINTER_DOWN)
+        every { event5.actionIndex }.returns(1)
+        every { event5.getPointerId(1) }.returns(POINTER_ID_3)
+        every { event5.findPointerIndex(POINTER_ID_2) }.returns(0)
+        every { event5.findPointerIndex(POINTER_ID_3) }.returns(1)
+        every { event5.getX(0) }.returns(0.0f)
+        every { event5.getY(0) }.returns(0.0f)
+        every { event5.getX(1) }.returns(0.0f)
+        every { event5.getY(1) }.returns(100.0f)
+
+        assertFalse(detector.onTouchEvent(event5))
+
+        pointerId1 = detector.getPrivateProperty("pointerId1")
+        assertEquals(POINTER_ID_2, pointerId1)
+        pointerId2 = detector.getPrivateProperty("pointerId2")
+        assertEquals(POINTER_ID_3, pointerId2)
+
+        // angle is restarted for the new pair of fingers
+        assertEquals(detector.initialAngle, detector.currentAngle, 0.0f)
+        assertEquals((Math.PI / 2.0).toFloat(), detector.initialAngle, 0.0f)
+    }
+
+    @Test
+    fun onTouchEvent_whenTrackedPointerIsLiftedWithThreeFingers_tracksRemainingPairWithoutJump() {
+        val listener = mockk<RotationGestureDetector.OnRotationGestureListener>()
+        every { listener.onRotation(any(), any(), any(), any()) }.returns(true)
+        val detector = RotationGestureDetector(listener)
+
+        startTwoFingerGesture(detector)
+
+        // 3rd finger touches the screen and is ignored
+        val event3 = mockk<MotionEvent>()
+        every { event3.actionMasked }.returns(MotionEvent.ACTION_POINTER_DOWN)
+        assertFalse(detector.onTouchEvent(event3))
+
+        var pointerId1: Int? = detector.getPrivateProperty("pointerId1")
+        assertEquals(POINTER_ID_1, pointerId1)
+        var pointerId2: Int? = detector.getPrivateProperty("pointerId2")
+        assertEquals(POINTER_ID_2, pointerId2)
+
+        // 2nd finger is lifted, 1st and 3rd fingers remain
+        val event4 = mockk<MotionEvent>()
+        every { event4.actionMasked }.returns(MotionEvent.ACTION_POINTER_UP)
+        every { event4.actionIndex }.returns(1)
+        every { event4.pointerCount }.returns(3)
+        every { event4.getPointerId(0) }.returns(POINTER_ID_1)
+        every { event4.getPointerId(1) }.returns(POINTER_ID_2)
+        every { event4.getPointerId(2) }.returns(POINTER_ID_3)
+        every { event4.findPointerIndex(POINTER_ID_1) }.returns(0)
+        every { event4.findPointerIndex(POINTER_ID_3) }.returns(2)
+        every { event4.getX(0) }.returns(0.0f)
+        every { event4.getY(0) }.returns(0.0f)
+        every { event4.getX(2) }.returns(-100.0f)
+        every { event4.getY(2) }.returns(0.0f)
+
+        assertFalse(detector.onTouchEvent(event4))
+
+        pointerId1 = detector.getPrivateProperty("pointerId1")
+        assertEquals(POINTER_ID_1, pointerId1)
+        pointerId2 = detector.getPrivateProperty("pointerId2")
+        assertEquals(POINTER_ID_3, pointerId2)
+
+        // moving without changing finger positions reports no rotation change
+        val event5 = mockk<MotionEvent>()
+        every { event5.actionMasked }.returns(MotionEvent.ACTION_MOVE)
+        every { event5.findPointerIndex(POINTER_ID_1) }.returns(0)
+        every { event5.findPointerIndex(POINTER_ID_3) }.returns(1)
+        every { event5.getX(0) }.returns(0.0f)
+        every { event5.getY(0) }.returns(0.0f)
+        every { event5.getX(1) }.returns(-100.0f)
+        every { event5.getY(1) }.returns(0.0f)
+
+        assertTrue(detector.onTouchEvent(event5))
+        verify(exactly = 1) { listener.onRotation(detector, 0.0f, -50.0f, 0.0f) }
+    }
+
+    @Test
+    fun onTouchEvent_whenTrackedPointerIsMissingOnMove_makesNoAction() {
+        val listener = mockk<RotationGestureDetector.OnRotationGestureListener>()
+        val detector = RotationGestureDetector(listener)
+
+        startTwoFingerGesture(detector)
+
+        val event3 = mockk<MotionEvent>()
+        every { event3.actionMasked }.returns(MotionEvent.ACTION_MOVE)
+        every { event3.findPointerIndex(POINTER_ID_1) }.returns(-1)
+        every { event3.findPointerIndex(POINTER_ID_2) }.returns(0)
+
+        assertFalse(detector.onTouchEvent(event3))
+        verify { listener wasNot Called }
+    }
+
+    @Test
+    fun onTouchEvent_whenUnknownAction_returnsFalseWithoutChanges() {
+        val detector = RotationGestureDetector()
+
+        startTwoFingerGesture(detector)
+
+        val event = mockk<MotionEvent>()
+        every { event.actionMasked }.returns(MotionEvent.ACTION_OUTSIDE)
+
+        assertFalse(detector.onTouchEvent(event))
+
+        val pointerId1: Int? = detector.getPrivateProperty("pointerId1")
+        assertEquals(POINTER_ID_1, pointerId1)
+        val pointerId2: Int? = detector.getPrivateProperty("pointerId2")
+        assertEquals(POINTER_ID_2, pointerId2)
+    }
+
+    @Test
+    fun onTouchEvent_whenPointerDownAndNoFingerTracked_tracksFirstFinger() {
+        val detector = RotationGestureDetector()
+
+        val event = mockk<MotionEvent>()
+        every { event.actionMasked }.returns(MotionEvent.ACTION_POINTER_DOWN)
+        every { event.actionIndex }.returns(ACTION_INDEX)
+        every { event.getPointerId(ACTION_INDEX) }.returns(POINTER_ID_2)
+
+        assertFalse(detector.onTouchEvent(event))
+
+        val pointerId1: Int? = detector.getPrivateProperty("pointerId1")
+        assertEquals(POINTER_ID_2, pointerId1)
+        val pointerId2: Int? = detector.getPrivateProperty("pointerId2")
+        assertEquals(INVALID_POINTER_ID, pointerId2)
+    }
+
+    @Test
+    fun onTouchEvent_whenSecondTrackedPointerIsMissingOnMove_makesNoAction() {
+        val listener = mockk<RotationGestureDetector.OnRotationGestureListener>()
+        val detector = RotationGestureDetector(listener)
+
+        startTwoFingerGesture(detector)
+
+        val event = mockk<MotionEvent>()
+        every { event.actionMasked }.returns(MotionEvent.ACTION_MOVE)
+        every { event.findPointerIndex(POINTER_ID_1) }.returns(0)
+        every { event.findPointerIndex(POINTER_ID_2) }.returns(-1)
+
+        assertFalse(detector.onTouchEvent(event))
+        verify { listener wasNot Called }
+    }
+
+    @Test
+    fun onTouchEvent_whenMoveAndNoListener_returnsFalse() {
+        val detector = RotationGestureDetector()
+
+        startTwoFingerGesture(detector)
+
+        val event = mockk<MotionEvent>()
+        every { event.actionMasked }.returns(MotionEvent.ACTION_MOVE)
+        every { event.findPointerIndex(POINTER_ID_1) }.returns(0)
+        every { event.findPointerIndex(POINTER_ID_2) }.returns(1)
+        every { event.getX(0) }.returns(0.0f)
+        every { event.getY(0) }.returns(0.0f)
+        every { event.getX(1) }.returns(0.0f)
+        every { event.getY(1) }.returns(100.0f)
+
+        assertFalse(detector.onTouchEvent(event))
+        assertEquals(0.0f, detector.pivotX, 0.0f)
+        assertEquals(50.0f, detector.pivotY, 0.0f)
+    }
+
+    @Test
+    fun onTouchEvent_whenUntrackedPointerIsLifted_keepsTrackedPointers() {
+        val detector = RotationGestureDetector()
+
+        startTwoFingerGesture(detector)
+
+        val event = mockk<MotionEvent>()
+        every { event.actionMasked }.returns(MotionEvent.ACTION_POINTER_UP)
+        every { event.actionIndex }.returns(2)
+        every { event.getPointerId(2) }.returns(POINTER_ID_3)
+
+        assertFalse(detector.onTouchEvent(event))
+
+        val pointerId1: Int? = detector.getPrivateProperty("pointerId1")
+        assertEquals(POINTER_ID_1, pointerId1)
+        val pointerId2: Int? = detector.getPrivateProperty("pointerId2")
+        assertEquals(POINTER_ID_2, pointerId2)
+    }
+
+    @Test
+    fun onTouchEvent_whenOnlyTrackedPointerIsLiftedAndAnotherRemains_tracksRemainingPointer() {
+        val detector = RotationGestureDetector()
+
+        val event1 = mockk<MotionEvent>()
+        every { event1.actionMasked }.returns(MotionEvent.ACTION_DOWN)
+        every { event1.getPointerId(0) }.returns(POINTER_ID_1)
+        assertFalse(detector.onTouchEvent(event1))
+
+        // 1st finger is lifted while an untracked finger remains
+        val event2 = mockk<MotionEvent>()
+        every { event2.actionMasked }.returns(MotionEvent.ACTION_POINTER_UP)
+        every { event2.actionIndex }.returns(0)
+        every { event2.pointerCount }.returns(2)
+        every { event2.getPointerId(0) }.returns(POINTER_ID_1)
+        every { event2.getPointerId(1) }.returns(POINTER_ID_3)
+
+        assertFalse(detector.onTouchEvent(event2))
+
+        val pointerId1: Int? = detector.getPrivateProperty("pointerId1")
+        assertEquals(POINTER_ID_3, pointerId1)
+        val pointerId2: Int? = detector.getPrivateProperty("pointerId2")
+        assertEquals(INVALID_POINTER_ID, pointerId2)
+    }
+
+    @Test
+    fun onTouchEvent_whenOnlyTrackedPointerIsLiftedAndNoneRemains_stopsTracking() {
+        val detector = RotationGestureDetector()
+
+        val event1 = mockk<MotionEvent>()
+        every { event1.actionMasked }.returns(MotionEvent.ACTION_DOWN)
+        every { event1.getPointerId(0) }.returns(POINTER_ID_1)
+        assertFalse(detector.onTouchEvent(event1))
+
+        val event2 = mockk<MotionEvent>()
+        every { event2.actionMasked }.returns(MotionEvent.ACTION_POINTER_UP)
+        every { event2.actionIndex }.returns(0)
+        every { event2.pointerCount }.returns(1)
+        every { event2.getPointerId(0) }.returns(POINTER_ID_1)
+
+        assertFalse(detector.onTouchEvent(event2))
+
+        val pointerId1: Int? = detector.getPrivateProperty("pointerId1")
+        assertEquals(INVALID_POINTER_ID, pointerId1)
+        val pointerId2: Int? = detector.getPrivateProperty("pointerId2")
+        assertEquals(INVALID_POINTER_ID, pointerId2)
+    }
+
+    @Test
+    fun onTouchEvent_whenSecondFingerIsNotFoundOnPointerDown_discardsSecondFinger() {
+        val detector = RotationGestureDetector()
+
+        val event1 = mockk<MotionEvent>()
+        every { event1.actionMasked }.returns(MotionEvent.ACTION_DOWN)
+        every { event1.getPointerId(0) }.returns(POINTER_ID_1)
+        assertFalse(detector.onTouchEvent(event1))
+
+        val event2 = mockk<MotionEvent>()
+        every { event2.actionMasked }.returns(MotionEvent.ACTION_POINTER_DOWN)
+        every { event2.actionIndex }.returns(ACTION_INDEX)
+        every { event2.getPointerId(ACTION_INDEX) }.returns(POINTER_ID_2)
+        every { event2.findPointerIndex(POINTER_ID_1) }.returns(0)
+        every { event2.findPointerIndex(POINTER_ID_2) }.returns(-1)
+
+        assertFalse(detector.onTouchEvent(event2))
+
+        val pointerId1: Int? = detector.getPrivateProperty("pointerId1")
+        assertEquals(POINTER_ID_1, pointerId1)
+        val pointerId2: Int? = detector.getPrivateProperty("pointerId2")
+        assertEquals(INVALID_POINTER_ID, pointerId2)
+    }
+
+    private fun startTwoFingerGesture(detector: RotationGestureDetector) {
+        val event1 = mockk<MotionEvent>()
+        every { event1.actionMasked }.returns(MotionEvent.ACTION_DOWN)
+        every { event1.getPointerId(0) }.returns(POINTER_ID_1)
+
+        assertFalse(detector.onTouchEvent(event1))
+
+        val event2 = mockk<MotionEvent>()
+        every { event2.actionMasked }.returns(MotionEvent.ACTION_POINTER_DOWN)
+        every { event2.actionIndex }.returns(ACTION_INDEX)
+        every { event2.getPointerId(ACTION_INDEX) }.returns(POINTER_ID_2)
+        every { event2.findPointerIndex(POINTER_ID_1) }.returns(POINTER_INDEX_1)
+        every { event2.getX(POINTER_INDEX_1) }.returns(0.0f)
+        every { event2.getY(POINTER_INDEX_1) }.returns(0.0f)
+        every { event2.findPointerIndex(POINTER_ID_2) }.returns(POINTER_INDEX_2)
+        every { event2.getX(POINTER_INDEX_2) }.returns(100.0f)
+        every { event2.getY(POINTER_INDEX_2) }.returns(0.0f)
+
+        assertFalse(detector.onTouchEvent(event2))
+    }
+
     private companion object {
         const val INVALID_POINTER_ID = -1
 
         const val POINTER_ID_1 = 0
 
         const val POINTER_ID_2 = 1
+
+        const val POINTER_ID_3 = 2
 
         const val ACTION_INDEX = 1
 

@@ -1,3 +1,19 @@
+/*
+ * Copyright (C) 2025 Alberto Irurueta Carro (alberto@irurueta.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.irurueta.android.gesturebitmap.test
 
 import android.content.Intent
@@ -1263,6 +1279,54 @@ class GestureBitmapViewTest {
         assertTrue(leftBoundReached > 0)
 
         assertTrue(scrollAnimationCompleted > 0)
+    }
+
+    @Test
+    fun dragIntoOverscrollMargin_whenRepeated_returnsToLimitsEveryTime() {
+        val view = this.view ?: return fail()
+
+        view.scrollAnimationCompletedListener = scrollAnimationCompletedListener
+
+        // zoom in so that the bitmap is bigger than the view
+        UiThreadStatement.runOnUiThread {
+            val params = view.transformationParameters
+            params.scale = 3.0
+            view.transformationParameters = params
+        }
+
+        val xy = IntArray(2)
+        view.getLocationOnScreen(xy)
+
+        val viewLeft = xy[0]
+        val viewTop = xy[1]
+        val viewWidth = view.width
+        val viewHeight = view.height
+        val viewCenterY = viewTop + viewHeight / 2
+
+        // drag far enough from the left side to the right side to enter the overscroll margin
+        val fromX = viewLeft + viewWidth / 10
+        val toX = viewLeft + viewWidth - viewWidth / 10
+
+        (1..2).forEach { i ->
+            reset()
+            assertEquals(0, scrollAnimationCompleted)
+
+            // push the bitmap to the left limit several times to ensure the margin is reached
+            (0 until 4).forEach { _ ->
+                InstrumentationTestHelper.drag(fromX, viewCenterY, toX, viewCenterY)
+            }
+
+            // releasing the finger must always animate the bitmap back to its limits
+            waitOnCondition({ scrollAnimationCompleted == 0 })
+            assertTrue("iteration $i", scrollAnimationCompleted > 0)
+
+            val rect = view.displayRect ?: return fail()
+            assertTrue("iteration $i: left ${rect.left}", rect.left <= 1.0f)
+            assertTrue(
+                "iteration $i: right ${rect.right}",
+                rect.right >= viewWidth - 1.0f
+            )
+        }
     }
 
     @Test

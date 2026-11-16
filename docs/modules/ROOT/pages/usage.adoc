@@ -70,6 +70,12 @@ view.setDrawable(drawable)
 WARNING: Setting a new bitmap calls `recycle()` on the bitmap previously held by the view. Do not set a bitmap you
 still need elsewhere, and do not reuse a bitmap after it has been replaced. A recycled bitmap is ignored when set.
 
+TIP: The view draws the whole bitmap on every frame, so very large bitmaps make gestures less fluid. Decode bitmaps at
+a size close to what will actually be displayed (view size multiplied by `maxScale` at most). Drawable resources
+placed in a density-less folder such as `drawable/` are treated as `mdpi` and get scaled up on denser screens; put
+large photos in `drawable-nodpi/` instead. The view enables mipmaps on the bitmap it is given
+(`Bitmap.setHasMipMap(true)`) to make drawing at reduced sizes cheaper.
+
 == Choosing a display type
 
 `displayType` decides how the bitmap is initially fitted into the view. The default is `FIT_X_CENTER`.
@@ -177,7 +183,7 @@ Setters throw `IllegalArgumentException` for out-of-range values (as noted in th
 
 |`rotateAndTranslateAnimationCompletedListener`
 |`OnRotateAndTranslateAnimationCompletedListener.onRotateAndTranslateAnimationCompleted(view)`
-|The rotate-and-translate animation that restores rotation and translation after reaching the minimum scale completes.
+|The scale animation that also restores rotation and translation when returning to the minimum scale completes.
 
 |`doubleTapListener`
 |`OnDoubleTapListener.onDoubleTap(view)`

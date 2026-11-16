@@ -35,12 +35,10 @@ import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.View
-import android.view.animation.AccelerateInterpolator
 import android.view.animation.DecelerateInterpolator
 import androidx.core.content.withStyledAttributes
 import androidx.core.graphics.drawable.toBitmap
 import androidx.core.os.BundleCompat
-import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
@@ -106,12 +104,8 @@ class GestureBitmapView @JvmOverloads constructor(
     private var rotationGestureDetector: RotationGestureDetector? = null
 
     /**
-     * Animator for simultaneous rotation and translation.
-     */
-    private var rotateAndTranslateAnimator: ValueAnimator? = null
-
-    /**
-     * Animator for scale.
+     * Animator for scale. When returning to minimum scale it also animates rotation and
+     * translation back to their initial values.
      */
     private var scaleAnimator: ValueAnimator? = null
 
@@ -130,26 +124,6 @@ class GestureBitmapView @JvmOverloads constructor(
      * limit computation.
      */
     private var bitmapDisplayedRect = RectF()
-
-    /**
-     * Left coordinate of bitmap displayed rectangle when a touch gesture starts.
-     */
-    private var startRectLeft: Float = 0.0f
-
-    /**
-     * Top coordinate of bitmap displayed rectangle when a touch gesture starts.
-     */
-    private var startRectTop: Float = 0.0f
-
-    /**
-     * Right coordinate of bitmap displayed rectangle when a touch gesture starts.
-     */
-    private var startRectRight: Float = 0.0f
-
-    /**
-     * Bottom coordinate of bitmap displayed rectangle when a touch gesture starts.
-     */
-    private var startRectBottom: Float = 0.0f
 
     /**
      * Paint used for drawing bitmaps with antialiasing.
@@ -282,6 +256,10 @@ class GestureBitmapView @JvmOverloads constructor(
 
         // set new bitmap
         if (bitmap != null && !bitmap.isRecycled) {
+            // bitmap is frequently drawn at a much smaller size than its own, mipmaps make
+            // minified drawing cheaper and smoother on hardware accelerated canvases
+            bitmap.setHasMipMap(true)
+
             if (resetMatrices) {
                 computeBaseMatrix(bitmap, displayType, baseMatrix)
 
@@ -289,7 +267,7 @@ class GestureBitmapView @JvmOverloads constructor(
                 resetTransformationParameters()
             } else {
                 cancelAllAnimators()
-                postInvalidate()
+                invalidate()
             }
         }
     }
@@ -341,7 +319,7 @@ class GestureBitmapView @JvmOverloads constructor(
                 paramsMatrix.preConcat(invBaseMatrix)
 
                 updateDisplayMatrix()
-                postInvalidate()
+                invalidate()
             }
         }
 
@@ -467,7 +445,7 @@ class GestureBitmapView @JvmOverloads constructor(
         cancelAllAnimators()
         paramsMatrix.reset()
         updateDisplayMatrix()
-        postInvalidate()
+        invalidate()
     }
 
     /**
@@ -486,7 +464,7 @@ class GestureBitmapView @JvmOverloads constructor(
             cancelAllAnimators()
             setTransformationParameters(value, paramsMatrix)
             updateDisplayMatrix()
-            postInvalidate()
+            invalidate()
         }
 
     /**
@@ -563,7 +541,9 @@ class GestureBitmapView @JvmOverloads constructor(
         action = action and MotionEvent.ACTION_MASK
         if (action == MotionEvent.ACTION_DOWN) {
             cancelAllAnimators()
-            updateStartDisplayedRectangleCoordinates()
+        } else if (action == MotionEvent.ACTION_POINTER_DOWN) {
+            // a multi-touch gesture has started, prevent scrolling parents from stealing it
+            parent?.requestDisallowInterceptTouchEvent(true)
         }
 
         val gestureHandled = if (twoFingerScrollEnabled || scrollEnabled || scaleEnabled) {
@@ -586,10 +566,10 @@ class GestureBitmapView @JvmOverloads constructor(
 
         if (gestureHandled || scaleHandled || rotationHandled) {
             updateDisplayMatrix()
-            postInvalidate()
+            invalidate()
         }
 
-        if (action == MotionEvent.ACTION_UP) {
+        if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
             limitScaleAndTranslation()
         }
 
@@ -607,7 +587,7 @@ class GestureBitmapView @JvmOverloads constructor(
         // draw bitmap
         val bitmap = this.bitmap
         if (bitmap != null && !bitmap.isRecycled) {
-            val displayMatrix = displayTransformationMatrix
+            // display matrix is used directly to avoid allocations while drawing
             canvas.drawBitmap(bitmap, displayMatrix, bitmapPaint)
         }
     }
@@ -705,7 +685,7 @@ class GestureBitmapView @JvmOverloads constructor(
         }
 
         // request redraw
-        postInvalidate()
+        invalidate()
     }
 
     /**
@@ -724,35 +704,21 @@ class GestureBitmapView @JvmOverloads constructor(
             cancelAllAnimators()
             computeBaseMatrix(bitmap, displayType, baseMatrix)
             updateDisplayMatrix()
-            postInvalidate()
+            invalidate()
         }
     }
 
     /**
-     * Updates bitmap displayed rectangle coordinates when touch gesture starts.
+     * Called when a touch gesture finishes to smoothly return scale and translation to their
+     * allowed limits.
      */
-    private fun updateStartDisplayedRectangleCoordinates() {
-        currentBitmapDisplayedRect(displayMatrix, bitmapDisplayedRect)
-        startRectLeft = bitmapDisplayedRect.left
-        startRectTop = bitmapDisplayedRect.top
-        startRectRight = bitmapDisplayedRect.right
-        startRectBottom = bitmapDisplayedRect.bottom
-    }
-
     private fun limitScaleAndTranslation() {
         getTransformationParameters(paramsMatrix, parameters)
         val currentScale = parameters.scale
         if (currentScale < minScale || currentScale > maxScale) {
             limitScale(currentScale)
-        } else {
-            val translateAnimator = this.translateAnimator
-            val scaleAnimator = this.scaleAnimator
-            if ((translateAnimator == null && scaleAnimator == null) ||
-                (translateAnimator != null && !translateAnimator.isRunning &&
-                        scaleAnimator != null && !scaleAnimator.isRunning)
-            ) {
-                smoothScrollBy(0.0f, 0.0f)
-            }
+        } else if (!isAnyAnimatorRunning()) {
+            smoothScrollBy(0.0f, 0.0f, skipIfNotNeeded = true)
         }
     }
 
@@ -772,7 +738,9 @@ class GestureBitmapView @JvmOverloads constructor(
     }
 
     /**
-     * Scrolls by provided amount.
+     * Scrolls by provided amount while a touch gesture is in progress.
+     * Scroll amount is limited so that bitmap is not moved beyond allowed limits, without
+     * snapping it back to them.
      *
      * @param dx amount of horizontal scroll to make.
      * @param dy amount of vertical scroll to make.
@@ -788,6 +756,7 @@ class GestureBitmapView @JvmOverloads constructor(
             rightScrollMargin,
             topScrollMargin,
             bottomScrollMargin,
+            snap = false,
             scrollDiff
         )
 
@@ -798,6 +767,9 @@ class GestureBitmapView @JvmOverloads constructor(
         val tx = (oldTx + scrollDiff.x).toFloat()
         val ty = (oldTy + scrollDiff.y).toFloat()
         updateTranslation(tx, ty, false)
+
+        // keep display matrix up to date, since scroll limits are computed from it
+        updateDisplayMatrix()
     }
 
     /**
@@ -805,9 +777,11 @@ class GestureBitmapView @JvmOverloads constructor(
      *
      * @param dx amount of horizontal scroll to make.
      * @param dy amount of vertical scroll to make.
+     * @param skipIfNotNeeded true to avoid starting an animation when no translation change is
+     * required, false to always start the animation.
      */
     private fun smoothScrollBy(
-        dx: Float, dy: Float
+        dx: Float, dy: Float, skipIfNotNeeded: Boolean = false
     ) {
         scrollDiff.x = dx
         scrollDiff.y = dy
@@ -818,8 +792,13 @@ class GestureBitmapView @JvmOverloads constructor(
             0.0f,
             0.0f,
             0.0f,
+            snap = true,
             scrollDiff
         )
+
+        if (skipIfNotNeeded && scrollDiff.x == 0.0f && scrollDiff.y == 0.0f) {
+            return
+        }
 
         getTransformationParameters(paramsMatrix, parameters)
         val oldTx = parameters.horizontalTranslation
@@ -833,12 +812,18 @@ class GestureBitmapView @JvmOverloads constructor(
     /**
      * Limits amount of scroll to ensure that bitmap remains visible.
      *
+     * Limits are computed from the rectangle where the bitmap is currently displayed, so that
+     * they remain valid when scale or rotation change in the middle of a gesture.
+     *
      * @param dx amount of horizontal translation (scroll) variation.
      * @param dy amount of vertical translation (scroll) variation.
      * @param leftMargin left scroll margin expressed in pixels.
      * @param rightMargin right scroll margin expressed in pixels.
      * @param topMargin top scroll margin expressed in pixels.
      * @param bottomMargin bottom scroll margin expressed in pixels.
+     * @param snap true if a bitmap lying outside of allowed limits must be fully returned to
+     * them (used when result is animated), false to never move the bitmap more than requested
+     * (used while a finger drags the bitmap, to avoid sudden jumps).
      * @param result point containing amount of allowed horizontal and vertical
      * scroll variation.
      */
@@ -846,89 +831,110 @@ class GestureBitmapView @JvmOverloads constructor(
         dx: Float, dy: Float,
         leftMargin: Float, rightMargin: Float,
         topMargin: Float, bottomMargin: Float,
+        snap: Boolean,
         result: PointF
     ) {
-        currentBitmapDisplayedRect(displayMatrix, bitmapDisplayedRect)
-
-        val oldRectLeft = bitmapDisplayedRect.left
-        val oldRectTop = bitmapDisplayedRect.top
-        val oldRectRight = bitmapDisplayedRect.right
-        val oldRectBottom = bitmapDisplayedRect.bottom
-
-        val newRectLeft = oldRectLeft + dx
-        val newRectTop = oldRectTop + dy
-        val newRectRight = oldRectRight + dx
-        val newRectBottom = oldRectBottom + dy
-
-        val paddedRight = width - rightMargin
-        val paddedBottom = height - bottomMargin
-
-        val viewCenterX = width / 2.0f
-        val viewCenterY = height / 2.0f
-        val oldRectCenterX = bitmapDisplayedRect.centerX()
-        val oldRectCenterY = bitmapDisplayedRect.centerY()
-
         result.x = dx
         result.y = dy
 
-        if (oldRectTop < topMargin && newRectTop >= topMargin) {
-            // top limit has been reached
-            result.y = topMargin - oldRectTop
-            topBoundReachedListener?.onTopBoundReached(this)
-        }
-        if (oldRectBottom > paddedBottom && newRectBottom <= paddedBottom) {
-            // bottom limit has been reached
-            result.y = paddedBottom - oldRectBottom
-            bottomBoundReachedListener?.onBottomBoundReached(this)
-        }
-        if (oldRectLeft < leftMargin && newRectLeft >= leftMargin) {
-            // left limit has been reached
-            result.x = leftMargin - oldRectLeft
-            leftBoundReachedListener?.onLeftBoundReached(this)
-        }
-        if (oldRectRight > paddedRight && newRectRight <= paddedRight) {
-            // right limit has been reached
-            result.x = paddedRight - oldRectRight
-            rightBoundReachedListener?.onRightBoundReached(this)
+        if (!currentBitmapDisplayedRect(displayMatrix, bitmapDisplayedRect)) {
+            return
         }
 
-        if (newRectTop >= topMargin || newRectBottom <= paddedBottom) {
-            // if either top or bottom exceeds allowed margin
-            if (startRectTop >= topMargin && startRectBottom <= paddedBottom) {
-                // if bitmap fits vertically within the view, then snap to vertical center
-                val dCenter = viewCenterY - oldRectCenterY
-                val minDCenter = dCenter - bottomMargin
-                val maxDCenter = dCenter + topMargin
-                result.y = max(min(dy, maxDCenter), minDCenter)
-            } else {
-                // otherwise, snap to closest destination point to the margin (either top or bottom)
-                val dTop = topMargin - newRectTop
-                val dBottom = paddedBottom - newRectBottom
-                result.y = if (abs(dTop) < abs(dBottom)) {
-                    topMargin - oldRectTop
-                } else {
-                    paddedBottom - oldRectBottom
-                }
-            }
+        val rectLeft = bitmapDisplayedRect.left
+        val rectTop = bitmapDisplayedRect.top
+        val rectWidth = bitmapDisplayedRect.width()
+        val rectHeight = bitmapDisplayedRect.height()
+        val viewWidth = width.toFloat()
+        val viewHeight = height.toFloat()
+
+        // vertical limits
+        val minTop = minAllowedStart(rectHeight, viewHeight, bottomMargin)
+        val maxTop = maxAllowedStart(rectHeight, viewHeight, topMargin)
+        val newTop = rectTop + dy
+        if (rectTop < maxTop && newTop >= maxTop) {
+            topBoundReachedListener?.onTopBoundReached(this)
         }
-        if (newRectLeft >= leftMargin || newRectRight <= paddedRight) {
-            // if either left or right exceeds allowed margin
-            if (startRectLeft >= leftMargin && startRectBottom <= paddedRight) {
-                // if bitmap fits horizontally within the view, then snap to horizontal center
-                val dCenter = viewCenterX - oldRectCenterX
-                val minDCenter = dCenter - leftMargin
-                val maxDCenter = dCenter + rightMargin
-                result.x = max(min(dx, maxDCenter), minDCenter)
-            } else {
-                // otherwise, snap to closest destination point to the margin (either left or right)
-                val dLeft = leftMargin - newRectLeft
-                val dRight = paddedRight - newRectRight
-                result.x = if (abs(dLeft) < abs(dRight)) {
-                    leftMargin - oldRectLeft
-                } else {
-                    paddedRight - oldRectRight
-                }
-            }
+        if (rectTop > minTop && newTop <= minTop) {
+            bottomBoundReachedListener?.onBottomBoundReached(this)
+        }
+        result.y = limitDelta(rectTop, dy, minTop, maxTop, snap)
+
+        // horizontal limits
+        val minLeft = minAllowedStart(rectWidth, viewWidth, rightMargin)
+        val maxLeft = maxAllowedStart(rectWidth, viewWidth, leftMargin)
+        val newLeft = rectLeft + dx
+        if (rectLeft < maxLeft && newLeft >= maxLeft) {
+            leftBoundReachedListener?.onLeftBoundReached(this)
+        }
+        if (rectLeft > minLeft && newLeft <= minLeft) {
+            rightBoundReachedListener?.onRightBoundReached(this)
+        }
+        result.x = limitDelta(rectLeft, dx, minLeft, maxLeft, snap)
+    }
+
+    /**
+     * Computes minimum allowed start (left or top) coordinate of displayed bitmap on one axis.
+     *
+     * @param rectSize size of displayed bitmap on the axis.
+     * @param viewSize size of the view on the axis.
+     * @param endMargin scroll margin at the end (right or bottom) of the axis.
+     * @return minimum allowed start coordinate.
+     */
+    private fun minAllowedStart(rectSize: Float, viewSize: Float, endMargin: Float): Float {
+        return if (rectSize <= viewSize) {
+            // bitmap fits within the view, it must remain centered (up to margin)
+            (viewSize - rectSize) / 2.0f - endMargin
+        } else {
+            // bitmap end can not leave an empty space larger than margin
+            viewSize - endMargin - rectSize
+        }
+    }
+
+    /**
+     * Computes maximum allowed start (left or top) coordinate of displayed bitmap on one axis.
+     *
+     * @param rectSize size of displayed bitmap on the axis.
+     * @param viewSize size of the view on the axis.
+     * @param startMargin scroll margin at the start (left or top) of the axis.
+     * @return maximum allowed start coordinate.
+     */
+    private fun maxAllowedStart(rectSize: Float, viewSize: Float, startMargin: Float): Float {
+        return if (rectSize <= viewSize) {
+            // bitmap fits within the view, it must remain centered (up to margin)
+            (viewSize - rectSize) / 2.0f + startMargin
+        } else {
+            // bitmap start can not leave an empty space larger than margin
+            startMargin
+        }
+    }
+
+    /**
+     * Limits requested variation of a coordinate so that it remains within provided range.
+     *
+     * @param current current value of coordinate.
+     * @param delta requested variation.
+     * @param minValue minimum allowed value.
+     * @param maxValue maximum allowed value.
+     * @param snap true to always end within the allowed range. If false and current value is
+     * already out of range (e.g. because scale or rotation have changed), only variations
+     * approaching the allowed range are accepted, and never beyond requested amount.
+     * @return allowed variation.
+     */
+    private fun limitDelta(
+        current: Float,
+        delta: Float,
+        minValue: Float,
+        maxValue: Float,
+        snap: Boolean
+    ): Float {
+        val target = current + delta
+        return when {
+            snap || (current in minValue..maxValue) ->
+                max(minValue, min(target, maxValue)) - current
+
+            current > maxValue -> if (delta < 0.0f) max(target, minValue) - current else 0.0f
+            else -> if (delta > 0.0f) min(target, maxValue) - current else 0.0f
         }
     }
 
@@ -997,7 +1003,7 @@ class GestureBitmapView @JvmOverloads constructor(
         setTransformationParameters(parameters, paramsMatrix)
         if (invalidate) {
             updateDisplayMatrix()
-            postInvalidate()
+            invalidate()
         }
     }
 
@@ -1121,7 +1127,7 @@ class GestureBitmapView @JvmOverloads constructor(
         setTransformationParameters(parameters, paramsMatrix)
         if (invalidate) {
             updateDisplayMatrix()
-            postInvalidate()
+            invalidate()
         }
     }
 
@@ -1280,27 +1286,6 @@ class GestureBitmapView @JvmOverloads constructor(
     }
 
     /**
-     * Updates parameters matrix with new rotation angle at provided pivot point and
-     * provided new translation values.
-     *
-     * @param rotationAngle new rotation angle to be set.
-     * @param pivotX horizontal coordinate of pivot point.
-     * @param pivotY vertical coordinate of pivot point.
-     * @param tx x coordinate of translation to be set.
-     * @param ty y coordinate of translation to be set.
-     */
-    private fun updateRotationAndTranslation(
-        rotationAngle: Float,
-        pivotX: Float,
-        pivotY: Float,
-        tx: Float,
-        ty: Float,
-    ) {
-        updateRotation(rotationAngle, pivotX, pivotY)
-        updateTranslation(tx, ty, invalidate = true)
-    }
-
-    /**
      * Cancels translate animator if it is running
      */
     private fun cancelTranslateAnimator() {
@@ -1382,6 +1367,8 @@ class GestureBitmapView @JvmOverloads constructor(
     /**
      * Scales up to provided scale using an animation and provided pivot point.
      * If no pivot point coordinates are provided, then view center is used.
+     * When provided scale is the minimum scale (or lower), rotation and translation are animated
+     * back to their initial values within the same animation.
      *
      * @param scale scale to animate to.
      * @param pivotX horizontal coordinate of pivot point.
@@ -1393,26 +1380,50 @@ class GestureBitmapView @JvmOverloads constructor(
         getTransformationParameters(paramsMatrix, parameters)
         val initialScale = parameters.scale.toFloat()
 
-        val scaleAnimator = ValueAnimator.ofFloat(initialScale, scale)
+        // when minimum scale is reached, view returns to initial translation and rotation.
+        // This is done within the same animation to obtain a single continuous movement.
+        val resetRotationAndTranslation = scale <= minScale
+
+        val scaleAnimator = if (resetRotationAndTranslation) {
+            val initValues = floatArrayOf(
+                initialScale,
+                parameters.rotationAngle.toFloat(),
+                parameters.horizontalTranslation.toFloat(),
+                parameters.verticalTranslation.toFloat()
+            )
+            val endValues = floatArrayOf(scale, 0.0f, 0.0f, 0.0f)
+            ValueAnimator.ofObject(FloatArrayEvaluator(), initValues, endValues)
+        } else {
+            ValueAnimator.ofFloat(initialScale, scale)
+        }
         this.scaleAnimator = scaleAnimator
 
         scaleAnimator.setTarget(this)
         scaleAnimator.addUpdateListener { animator ->
-            val s = animator.animatedValue as Float
-            updateScale(s.toDouble(), pivotX, pivotY, invalidate = true)
+            if (resetRotationAndTranslation) {
+                val value = animator.animatedValue as FloatArray
+                updateAllParameters(value[0], value[1], value[2], value[3])
+            } else {
+                val s = animator.animatedValue as Float
+                updateScale(s.toDouble(), pivotX, pivotY, invalidate = true)
+            }
         }
         scaleAnimator.duration = animationDurationMillis
-        scaleAnimator.interpolator = AccelerateInterpolator()
+        scaleAnimator.interpolator = DecelerateInterpolator()
 
         scaleAnimator.addListener(object : Animator.AnimatorListener {
             var cancelled = false
 
             override fun onAnimationEnd(animation: Animator) {
                 if (!cancelled) {
-                    updateScale(
-                        scale.toDouble(), pivotX, pivotY,
-                        invalidate = true
-                    )
+                    if (resetRotationAndTranslation) {
+                        updateAllParameters(scale, 0.0f, 0.0f, 0.0f)
+                    } else {
+                        updateScale(
+                            scale.toDouble(), pivotX, pivotY,
+                            invalidate = true
+                        )
+                    }
                 }
 
                 getTransformationParameters(paramsMatrix, parameters)
@@ -1432,10 +1443,10 @@ class GestureBitmapView @JvmOverloads constructor(
                     this@GestureBitmapView
                 )
 
-                // ensure that view returns to initial translation and rotation at
-                // minimum scale
-                if (currentScale <= minScale) {
-                    smoothRotateAndTranslateTo(0.0f, width / 2.0f, height / 2.0f, 0.0f, 0.0f)
+                if (resetRotationAndTranslation && !cancelled) {
+                    // rotation and translation have also been animated
+                    rotateAndTranslateAnimationCompletedListener
+                        ?.onRotateAndTranslateAnimationCompleted(this@GestureBitmapView)
                 }
             }
 
@@ -1456,86 +1467,32 @@ class GestureBitmapView @JvmOverloads constructor(
     }
 
     /**
-     * Cancels rotate and translate animator if it is running.
-     */
-    private fun cancelRotateAndTranslateAnimator() {
-        val rotateAndTranslateAnimator = this.rotateAndTranslateAnimator
-        if (rotateAndTranslateAnimator != null && rotateAndTranslateAnimator.isRunning) {
-            rotateAndTranslateAnimator.cancel()
-        }
-    }
-
-    /**
-     * Rotates and translates up to provided values using provided pivot point for
-     * rotation.
+     * Sets all parameters of the transformation applied respect the base matrix and requests
+     * a redraw.
      *
-     * @param rotationAngle new rotation angle to be set.
-     * @param pivotX horizontal coordinate of pivot point.
-     * @param pivotY vertical coordinate of pivot point.
+     * @param scale scale to be set.
+     * @param rotationAngle rotation angle to be set expressed in radians.
      * @param tx x coordinate of translation to be set.
      * @param ty y coordinate of translation to be set.
      */
-    @Suppress("SameParameterValue")
-    private fun smoothRotateAndTranslateTo(
-        rotationAngle: Float,
-        pivotX: Float,
-        pivotY: Float,
-        tx: Float,
-        ty: Float
-    ) {
-        cancelAllAnimators()
+    private fun updateAllParameters(scale: Float, rotationAngle: Float, tx: Float, ty: Float) {
+        parameters.scale = scale.toDouble()
+        parameters.rotationAngle = rotationAngle.toDouble()
+        parameters.horizontalTranslation = tx.toDouble()
+        parameters.verticalTranslation = ty.toDouble()
 
-        getTransformationParameters(paramsMatrix, parameters)
+        setTransformationParameters(parameters, paramsMatrix)
+        updateDisplayMatrix()
+        invalidate()
+    }
 
-        val initTheta = parameters.rotationAngle.toFloat()
-        val initTx = parameters.horizontalTranslation.toFloat()
-        val initTy = parameters.verticalTranslation.toFloat()
-        val initValues = floatArrayOf(initTheta, initTx, initTy)
-        val endValues = floatArrayOf(rotationAngle, tx, ty)
-
-        val rotateAndTranslateAnimator = ValueAnimator.ofObject(
-            FloatArrayEvaluator(),
-            initValues, endValues
-        )
-        this.rotateAndTranslateAnimator = rotateAndTranslateAnimator
-
-        rotateAndTranslateAnimator.setTarget(this)
-        rotateAndTranslateAnimator.addUpdateListener { animator ->
-            val value = animator.animatedValue as FloatArray
-            updateRotationAndTranslation(value[0], pivotX, pivotY, value[1], value[2])
-        }
-        rotateAndTranslateAnimator.duration = animationDurationMillis
-        rotateAndTranslateAnimator.interpolator = DecelerateInterpolator()
-
-        rotateAndTranslateAnimator.addListener(object : Animator.AnimatorListener {
-            var cancelled = false
-
-            override fun onAnimationEnd(animation: Animator) {
-                if (!cancelled) {
-                    updateRotationAndTranslation(rotationAngle, pivotX, pivotY, tx, ty)
-                }
-
-                rotateAndTranslateAnimationCompletedListener?.onRotateAndTranslateAnimationCompleted(
-                    this@GestureBitmapView
-                )
-            }
-
-            override fun onAnimationRepeat(animation: Animator) {
-                // not used
-            }
-
-
-            override fun onAnimationCancel(animation: Animator) {
-                cancelled = true
-            }
-
-            override fun onAnimationStart(animation: Animator) {
-                // not used
-            }
-
-        })
-
-        rotateAndTranslateAnimator.start()
+    /**
+     * Indicates whether any animator is currently running.
+     *
+     * @return true if at least one animator is running, false otherwise.
+     */
+    private fun isAnyAnimatorRunning(): Boolean {
+        return translateAnimator?.isRunning == true || scaleAnimator?.isRunning == true
     }
 
     /**
@@ -1544,7 +1501,6 @@ class GestureBitmapView @JvmOverloads constructor(
     private fun cancelAllAnimators() {
         cancelTranslateAnimator()
         cancelScaleAnimator()
-        cancelRotateAndTranslateAnimator()
     }
 
     /**
@@ -1858,6 +1814,7 @@ class GestureBitmapView @JvmOverloads constructor(
 
                         cancelAllAnimators()
 
+                        getTransformationParameters(paramsMatrix, parameters)
                         val scale = parameters.scale
 
                         val scaleFactor = detector.scaleFactor
@@ -1905,6 +1862,15 @@ class GestureBitmapView @JvmOverloads constructor(
                 }
 
 
+                /**
+                 * Starts an animated scroll that continues the movement of a fling gesture.
+                 *
+                 * @param e1 first down motion event that started the fling.
+                 * @param e2 move motion event that triggered the current fling.
+                 * @param velocityX horizontal velocity of the fling expressed in pixels per second.
+                 * @param velocityY vertical velocity of the fling expressed in pixels per second.
+                 * @return true if the fling has been handled, false otherwise.
+                 */
                 override fun onFling(
                     e1: MotionEvent?,
                     e2: MotionEvent,
@@ -1933,9 +1899,12 @@ class GestureBitmapView @JvmOverloads constructor(
                     getTransformationParameters(paramsMatrix, parameters)
 
                     // process fling
+                    // scroll is animated with a decelerate interpolator, whose initial speed
+                    // is twice the average one. Hence, the distance below makes the animation
+                    // start at the velocity of the finger
                     val time = animationDurationMillis.toFloat() / 1000.0f
-                    val diffX = velocityX * time
-                    val diffY = velocityY * time
+                    val diffX = velocityX * time / FLING_INITIAL_SPEED_FACTOR
+                    val diffY = velocityY * time / FLING_INITIAL_SPEED_FACTOR
 
                     smoothScrollBy(diffX, diffY)
                     return true
@@ -2037,6 +2006,11 @@ class GestureBitmapView @JvmOverloads constructor(
          * reached.
          */
         const val DEFAULT_SCROLL_MARGIN = 100.0f
+
+        /**
+         * Ratio between initial and average speed of the interpolator used to animate scroll.
+         */
+        private const val FLING_INITIAL_SPEED_FACTOR = 2.0f
 
         /**
          * Key to store state of parent class.
