@@ -87,12 +87,12 @@ sonar {
 
         property("sonar.coverage.jacoco.xmlReportPaths",
             listOf("build/reports/coverage/androidTest/debug/connected/report.xml",
-                "build/reports/coverage/test/report.xml"))
+                "build/reports/coverage/test/debug/report.xml"))
         property("sonar.java.coveragePlugin", "jacoco")
-        property("sonar.junit.reportsPath",
-            listOf("build/build/test-results/testDebugUnitTest",
-                "build/build/outputs/androidTest-results/connected/debug"))
-        property("sonar.android.lint.report", "build/build/reports/lint-results-debug.xml")
+        property("sonar.junit.reportPaths",
+            listOf("build/test-results/testDebugUnitTest",
+                "build/outputs/androidTest-results/connected/debug"))
+        property("sonar.androidLint.reportPaths", "build/reports/lint-results-debug.xml")
     }
 }
 

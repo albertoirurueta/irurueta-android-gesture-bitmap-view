@@ -1,0 +1,119 @@
+= Building, testing and contributing
+
+NOTE: This documentation was generated with the assistance of AI. Please report any inaccuracies.
+
+== Project layout
+
+[cols="1,3",options="header"]
+|===
+|Path |Contents
+
+|`lib/` |The library (`com.irurueta.android.gesturebitmap`), published as
+`com.irurueta:irurueta-android-gesture-bitmap-view`.
+|`lib/src/main/res/values/attrs.xml` |XML attributes of `GestureBitmapView`.
+|`lib/src/test/` |Local unit tests (JUnit, run with Robolectric).
+|`lib/src/androidTest/` |Instrumented tests, run on a device or emulator against a test activity
+(`GestureBitmapViewActivity`) that hosts the view.
+|`app/` |The xref:sample-app.adoc[sample app].
+|`docs/` |This Antora documentation site.
+|===
+
+== Requirements
+
+* JDK 17.
+* Android SDK with platform 36.
+* For instrumented tests: a connected device or emulator.
+* For the documentation: Node.js 20 or later.
+
+== Building
+
+[source,bash]
+----
+./gradlew :lib:assemble
+----
+
+== Running the tests
+
+[source,bash]
+----
+# All local unit tests
+./gradlew test
+
+# Only the library's unit tests
+./gradlew lib:test
+
+# Instrumented tests (needs a device or emulator)
+./gradlew connectedAndroidTest
+./gradlew lib:connectedAndroidTest
+----
+
+Unit tests live in `GestureBitmapViewTest`, `RotationGestureDetectorTest`, `MetricTransformationParametersTest` and
+`InvalidMatrixExceptionTest` under `lib/src/test/java/com/irurueta/android/gesturebitmap/`. The instrumented
+`GestureBitmapViewTest` under `lib/src/androidTest/` drives the view with real touch events.
+
+== Coverage
+
+The debug build type enables unit and instrumented test coverage. To convert the unit test execution data into HTML
+and XML reports with the JaCoCo CLI bundled in the repository:
+
+[source,bash]
+----
+java -jar jacoco-0.8.13/lib/jacococli.jar report lib/build/jacoco/testReleaseUnitTest.exec \
+  --classfiles lib/build/tmp/kotlin-classes/debug \
+  --sourcefiles lib/src/main/java \
+  --html lib/build/reports/coverage/test \
+  --xml lib/build/reports/coverage/test/report.xml
+----
+
+== API documentation
+
+The KDoc API reference is generated with Dokka:
+
+[source,bash]
+----
+./gradlew lib:dokkaGenerate
+----
+
+The output is written to `lib/build/dokka/html`.
+
+== Static analysis
+
+The library is analysed on SonarCloud:
+
+[source,bash]
+----
+./gradlew :lib:sonar
+----
+
+`./gradlew lint` runs Android lint.
+
+== Continuous integration
+
+The `CI` GitHub Actions workflow (`.github/workflows/main.yml`) runs on pushes and pull requests to `main`. It runs
+`./gradlew clean test connectedAndroidTest lint lib:dokkaGenerate` on an API 35 emulator, publishes the test results,
+converts the coverage report, sends the analysis to SonarCloud and deploys the Dokka output to GitHub Pages. The
+`publish.yml` workflow publishes the library to Maven Central when a GitHub release is published.
+
+== Building this documentation
+
+From `docs/` (Node.js 20 or later):
+
+[source,bash]
+----
+npm ci
+npx antora antora-playbook.yml
+npx pagefind --site build/site
+----
+
+The site is written to `docs/build/site`. Search only works over HTTP, for instance with
+`python3 -m http.server 8090 --directory docs/build/site` and http://localhost:8090.
+
+== Contributing
+
+. Fork the repository and create a branch from `main`.
+. Keep public API changes documented with KDoc, and update these pages when behavior or configuration changes.
+. Add or update unit tests (and instrumented tests for gesture behavior), and make sure `./gradlew test` passes.
+. Open a pull request against `main`; the CI workflow must pass.
+
+The project is licensed under the Apache License 2.0 (see `LICENSE`); contributions are accepted under the same
+license.

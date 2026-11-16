@@ -1,0 +1,140 @@
+= Gestures
+
+NOTE: This documentation was generated with the assistance of AI. Please report any inaccuracies.
+
+`GestureBitmapView` combines three detectors: Android's `GestureDetector` (scroll, fling, single tap, double tap and
+long press), Android's `ScaleGestureDetector` (pinch) and the library's own `RotationGestureDetector` (two-finger
+rotation). On every touch event the view feeds each enabled detector, redraws, and when the last finger is lifted
+animates the bitmap back within its scale and scroll limits.
+
+[mermaid]
+....
+flowchart TD
+    T["Touch event"] --> DOWN{"First finger down?"}
+    DOWN -->|yes| C["Cancel running animations"]
+    DOWN -->|no| G
+    C --> G["GestureDetector: scroll, fling, taps<br>(when scrollEnabled, twoFingerScrollEnabled or scaleEnabled)"]
+    G --> S["ScaleGestureDetector: pinch<br>(when scaleEnabled)"]
+    S --> R["RotationGestureDetector: rotation<br>(when rotationEnabled)"]
+    R --> UP{"Last finger up?"}
+    UP -->|yes| L["Animate back within scale and scroll limits"]
+    UP -->|no| E["Redraw"]
+    L --> E
+....
+
+== Scroll (translation)
+
+Dragging moves the bitmap. Three flags control which fingers can scroll:
+
+[cols="1,1,1,3",options="header"]
+|===
+|`scrollEnabled` |`twoFingerScrollEnabled` |`exclusiveTwoFingerScrollEnabled` |Result
+
+|`false` |any |any |No scrolling.
+|`true` |any |`false` (default) |Scroll with one or two fingers; the number of fingers is not checked (two-finger
+scroll can be combined with pinch and rotation).
+|`true` |`true` (default) |`true` |Scroll with two fingers only; one-finger drags are ignored.
+|`true` |`false` |`true` |Scroll with one finger only; drags with more than one finger are ignored.
+|===
+
+Defaults: `scrollEnabled = true`, `twoFingerScrollEnabled = true`, `exclusiveTwoFingerScrollEnabled = false`.
+
+=== Scroll limits and bounce
+
+The bitmap can be dragged past its edges by up to `leftScrollMargin`, `topScrollMargin`, `rightScrollMargin` and
+`bottomScrollMargin` pixels (100 by default). When an edge of the bitmap reaches its limit the matching
+`OnTopBoundReachedListener`, `OnBottomBoundReachedListener`, `OnLeftBoundReachedListener` or
+`OnRightBoundReachedListener` is notified. If the bitmap is smaller than the view along an axis, scrolling along that
+axis keeps it near the center. When the finger is lifted, the bitmap animates back so that it no longer exceeds its
+limits, which produces a bounce effect. Set the margins to `0` to avoid any overshoot.
+
+=== Fling
+
+A fling (fast swipe) follows the same `scrollEnabled`/two-finger rules as scroll. It produces an animated scroll whose
+distance is the fling velocity multiplied by `animationDurationMillis` (converted to seconds), still bounded by the
+scroll limits. `OnScrollAnimationCompletedListener` is notified when the animation ends.
+
+== Zoom (scale)
+
+=== Pinch
+
+With `scaleEnabled = true` (default), pinching scales the bitmap around the focal point between the fingers. During
+the gesture the scale is clamped to the range `[minScale - minScaleMargin, maxScale + maxScaleMargin]`, so the bitmap
+can be zoomed slightly beyond its limits. When the fingers are lifted, a scale outside `[minScale, maxScale]` animates
+back to the nearest limit. At the end of that animation:
+
+* `OnMinScaleReachedListener` is notified if the scale is at or below `minScale`, and
+  `OnMaxScaleReachedListener` if it is at or above `maxScale`;
+* `OnScaleAnimationCompletedListener` is notified;
+* if the scale is at or below `minScale`, rotation and translation are animated back to zero, so the bitmap returns to
+  its initial position, and `OnRotateAndTranslateAnimationCompletedListener` is notified when that finishes.
+
+`minScale` (default `1.0`) and `maxScale` (default `10.0`) are relative to the initial display defined by
+`displayType`: a scale of `1.0` means the bitmap is shown as initially fitted.
+
+=== Double tap
+
+With `doubleTapEnabled = true` (default), a double tap zooms in with an animation centered on the tapped point. Each
+double tap adds `scaleFactorJump` (default `3.0`) to the current scale, up to `maxScale`. Once `maxScale` is reached,
+the next double tap zooms back to a scale of `1.0` (kept within `[minScale, maxScale]`), and the cycle starts again.
+A pinch gesture restarts the cycle in the zoom-in direction.
+
+`OnDoubleTapListener` is notified on every double tap, even when `doubleTapEnabled` is `false`, so you can implement
+your own double-tap behavior.
+
+NOTE: Taps are detected by the same `GestureDetector` as scrolling, which only receives events while at least one of
+`scrollEnabled`, `twoFingerScrollEnabled` or `scaleEnabled` is `true`.
+
+== Rotation
+
+With `rotationEnabled = true` (default), rotating two fingers rotates the bitmap around the midpoint between them.
+There is no rotation limit, and the rotation is kept after the fingers are lifted (it is reset only when a scale
+animation ends at the minimum scale, or by `resetTransformationParameters()`). Disable it with
+`rotationEnabled = false` or `app:rotationEnabled="false"`.
+
+=== Using RotationGestureDetector on its own
+
+`RotationGestureDetector` can be reused in your own views. Feed it touch events and implement
+`OnRotationGestureListener`:
+
+[source,kotlin]
+----
+private val rotationDetector = RotationGestureDetector(
+    object : RotationGestureDetector.OnRotationGestureListener {
+        override fun onRotation(
+            gestureDetector: RotationGestureDetector,
+            angle: Float,
+            pivotX: Float,
+            pivotY: Float
+        ): Boolean {
+            // angle: variation in radians since the previous event
+            // gestureDetector.deltaAngleStart: variation since both fingers touched down
+            rotateContentBy(angle, pivotX, pivotY)
+            return true
+        }
+    })
+
+override fun onTouchEvent(event: MotionEvent?): Boolean {
+    rotationDetector.onTouchEvent(event)
+    return true
+}
+----
+
+`onRotation` is called on each move event while two fingers are down, with the angle variation (radians) relative to
+the previous event and the pivot at the midpoint between the fingers. `onTouchEvent` returns the value returned by the
+listener for those events and `false` otherwise. The detector also exposes the finger coordinates (`initialX1`,
+`initialY1`, `initialX2`, `initialY2`, `currentX1`, `currentY1`, `currentX2`, `currentY2`), the angles
+(`initialAngle`, `currentAngle`, `deltaAngleStart`, `deltaAngle`) and the pivot (`pivotX`, `pivotY`). The `listener`
+property can be replaced at any time.
+
+== Single tap and long press
+
+A confirmed single tap calls `performClick()` and a long press calls `performLongClick()` (only when the view is
+long-clickable and no pinch is in progress), so the standard `setOnClickListener` and `setOnLongClickListener` work
+with the view.
+
+== Animations
+
+Double-tap zoom, the return within limits, flings and the reset after reaching the minimum scale are animated over
+`animationDurationMillis` (default `200` ms). Any running animation is cancelled when a new touch starts, when the
+bitmap, `displayType` or view size changes, or when the transformation is set programmatically.
