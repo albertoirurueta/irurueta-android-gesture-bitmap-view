@@ -1316,9 +1316,15 @@ class GestureBitmapViewTest {
                 InstrumentationTestHelper.drag(fromX, viewCenterY, toX, viewCenterY)
             }
 
-            // releasing the finger must always animate the bitmap back to its limits
-            waitOnCondition({ scrollAnimationCompleted == 0 })
+            // releasing the finger must always animate the bitmap back to its limits.
+            // Animation completions of previous drags can not be used to know when the last
+            // release has finished, hence displayed rectangle is polled instead
             assertTrue("iteration $i", scrollAnimationCompleted > 0)
+            var retries = 0
+            while (!isWithinHorizontalLimits(view, viewWidth) && retries < POLL_RETRIES) {
+                Thread.sleep(POLL_INTERVAL_MILLIS)
+                retries++
+            }
 
             val rect = view.displayRect ?: return fail()
             assertTrue("iteration $i: left ${rect.left}", rect.left <= 1.0f)
@@ -1456,6 +1462,11 @@ class GestureBitmapViewTest {
         doubleTap = 0
     }
 
+    private fun isWithinHorizontalLimits(view: GestureBitmapView, viewWidth: Int): Boolean {
+        val rect = view.displayRect ?: return false
+        return rect.left <= 1.0f && rect.right >= viewWidth - 1.0f
+    }
+
     private fun waitOnCondition(
         condition: () -> Boolean,
         maxRetries: Int = MAX_RETRIES,
@@ -1475,5 +1486,7 @@ class GestureBitmapViewTest {
         private const val ABSOLUTE_ERROR = 1e-4
         private const val MAX_RETRIES = 2
         private const val TIMEOUT = 20000L
+        private const val POLL_RETRIES = 50
+        private const val POLL_INTERVAL_MILLIS = 100L
     }
 }

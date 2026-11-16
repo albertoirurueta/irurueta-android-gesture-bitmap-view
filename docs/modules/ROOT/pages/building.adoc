@@ -20,7 +20,7 @@ NOTE: This documentation was generated with the assistance of AI. Please report 
 
 == Requirements
 
-* JDK 17.
+* JDK 21 to run the build (required by the SonarCloud scanner). The library is still compiled for JVM target 17.
 * Android SDK with platform 36.
 * For instrumented tests: a connected device or emulator.
 * For the documentation: Node.js 20 or later.
