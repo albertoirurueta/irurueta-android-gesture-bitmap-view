@@ -1,0 +1,265 @@
+= Usage
+
+NOTE: This documentation was generated with the assistance of AI. Please report any inaccuracies.
+
+This page shows how to add `GestureBitmapView` (package `com.irurueta.android.gesturebitmap`) to a screen, set the
+bitmap, choose a display type, toggle gestures and listen to its events. Every property mentioned here is listed with
+its default value in the xref:configuration.adoc[Configuration reference].
+
+== Adding the view to a layout
+
+[source,xml]
+----
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <com.irurueta.android.gesturebitmap.GestureBitmapView
+        android:id="@+id/gesture_bitmap"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:src="@drawable/image"
+        app:displayType="fit_if_bigger"
+        app:maxScale="5.0"
+        app:rotationEnabled="false"/>
+
+</androidx.constraintlayout.widget.ConstraintLayout>
+----
+
+All custom attributes use the `app:` (`res-auto`) namespace. See
+xref:configuration.adoc#xml-attributes[XML attributes] for the full list.
+
+== Creating the view in code
+
+`GestureBitmapView` has a `@JvmOverloads` constructor `(context, attrs = null, defStyleAttr = 0)`, so it can also be
+created programmatically:
+
+[source,kotlin]
+----
+val view = GestureBitmapView(context)
+view.displayType = GestureBitmapView.DisplayType.CENTER_CROP
+view.setDrawable(ContextCompat.getDrawable(context, R.drawable.image))
+container.addView(view)
+----
+
+== Setting the bitmap
+
+[source,kotlin]
+----
+val view = findViewById<GestureBitmapView>(R.id.gesture_bitmap)
+
+// From a Bitmap: resets the transformation (scale, rotation and translation)
+view.bitmap = bitmap
+
+// Same, with explicit control over resetting the transformation
+view.setBitmap(otherBitmap, resetMatrices = false)
+
+// From a Drawable, converted to a bitmap of its intrinsic size
+view.setDrawable(drawable)
+----
+
+* Assigning `bitmap` is equivalent to `setBitmap(value, resetMatrices = true)`: the base transformation is recomputed
+  for the current `displayType` and the gesture transformation is reset.
+* `setBitmap(bitmap, resetMatrices = false)` keeps the current base and gesture transformations, which is useful to
+  replace the image with another one of the same size (for instance a processed version) without losing the current
+  zoom and position.
+* `setDrawable(drawable)` converts the drawable with `Drawable.toBitmap()` and assigns it to `bitmap`.
+
+WARNING: Setting a new bitmap calls `recycle()` on the bitmap previously held by the view. Do not set a bitmap you
+still need elsewhere, and do not reuse a bitmap after it has been replaced. A recycled bitmap is ignored when set.
+
+== Choosing a display type
+
+`displayType` decides how the bitmap is initially fitted into the view. The default is `FIT_X_CENTER`.
+
+[cols="1,1,3",options="header"]
+|===
+|`DisplayType` |XML value |Initial display
+
+|`NONE` |`none` |Original scale, no rotation or translation.
+|`FIT_IF_BIGGER` |`fit_if_bigger` |Scaled down to fit (keeping aspect ratio) and centered only if bigger than the view.
+|`FIT_X_TOP` |`fit_x_top` |Scaled to fit horizontally, aligned to the top border.
+|`FIT_X_BOTTOM` |`fit_x_bottom` |Scaled to fit horizontally, aligned to the bottom border.
+|`FIT_X_CENTER` |`fit_x_center` |Scaled to fit horizontally, vertically centered (default).
+|`FIT_Y_LEFT` |`fit_y_left` |Scaled to fit vertically, aligned to the left border.
+|`FIT_Y_RIGHT` |`fit_y_right` |Scaled to fit vertically, aligned to the right border.
+|`FIT_Y_CENTER` |`fit_y_center` |Scaled to fit vertically, horizontally centered.
+|`CENTER_CROP` |`center_crop` |Scaled to fill the whole view, keeping aspect ratio, and centered.
+|===
+
+The "fit" modes keep the aspect ratio, so there may be blank space along the other axis, or the bitmap may not fit
+completely along it.
+
+Changing `displayType` at runtime keeps what is currently on screen unchanged: the base transformation is recomputed
+and the gesture transformation is adjusted so that the overall display transformation stays the same. The base
+transformation is also recomputed when the view is resized.
+
+[source,kotlin]
+----
+view.displayType = GestureBitmapView.DisplayType.FIT_Y_CENTER
+----
+
+== Enabling and disabling gestures
+
+[source,kotlin]
+----
+view.scrollEnabled = true
+view.twoFingerScrollEnabled = true
+view.exclusiveTwoFingerScrollEnabled = false
+view.scaleEnabled = true
+view.doubleTapEnabled = true
+view.rotationEnabled = false
+----
+
+See xref:gestures.adoc[Gestures] for how these flags interact.
+
+== Limits and bounce effect
+
+[source,kotlin]
+----
+view.minScale = 1.0f          // must be > 0
+view.maxScale = 5.0f          // must be > 0
+view.scaleFactorJump = 2.0f   // must be >= 1
+view.minScaleMargin = 0.1f
+view.maxScaleMargin = 1.0f
+view.leftScrollMargin = 50.0f // pixels, must be >= 0
+view.topScrollMargin = 50.0f
+view.rightScrollMargin = 50.0f
+view.bottomScrollMargin = 50.0f
+view.animationDurationMillis = 300L
+----
+
+Setters throw `IllegalArgumentException` for out-of-range values (as noted in the comments above).
+
+[#listeners]
+== Listeners
+
+`GestureBitmapView` exposes one nullable property per event. Each listener is a regular Kotlin interface nested in
+`GestureBitmapView`, with a single method that receives the view that raised the event.
+
+[cols="2,2,3",options="header"]
+|===
+|Property |Interface and method |Raised when
+
+|`topBoundReachedListener`
+|`OnTopBoundReachedListener.onTopBoundReached(view)`
+|A scroll reaches the top limit of the bitmap.
+
+|`bottomBoundReachedListener`
+|`OnBottomBoundReachedListener.onBottomBoundReached(view)`
+|A scroll reaches the bottom limit.
+
+|`leftBoundReachedListener`
+|`OnLeftBoundReachedListener.onLeftBoundReached(view)`
+|A scroll reaches the left limit.
+
+|`rightBoundReachedListener`
+|`OnRightBoundReachedListener.onRightBoundReached(view)`
+|A scroll reaches the right limit.
+
+|`minScaleReachedListener`
+|`OnMinScaleReachedListener.onMinScaleReached(view)`
+|A scale animation ends at or below `minScale`.
+
+|`maxScaleReachedListener`
+|`OnMaxScaleReachedListener.onMaxScaleReached(view)`
+|A scale animation ends at or above `maxScale`.
+
+|`scaleAnimationCompletedListener`
+|`OnScaleAnimationCompletedListener.onScaleAnimationCompleted(view)`
+|A scale animation (double tap, or returning within the scale limits) completes.
+
+|`scrollAnimationCompletedListener`
+|`OnScrollAnimationCompletedListener.onScrollAnimationCompleted(view)`
+|A scroll animation (fling, or returning within the scroll limits) completes.
+
+|`rotateAndTranslateAnimationCompletedListener`
+|`OnRotateAndTranslateAnimationCompletedListener.onRotateAndTranslateAnimationCompleted(view)`
+|The rotate-and-translate animation that restores rotation and translation after reaching the minimum scale completes.
+
+|`doubleTapListener`
+|`OnDoubleTapListener.onDoubleTap(view)`
+|A double tap is detected (raised even when `doubleTapEnabled` is `false`).
+|===
+
+[source,kotlin]
+----
+view.doubleTapListener = object : GestureBitmapView.OnDoubleTapListener {
+    override fun onDoubleTap(view: GestureBitmapView) {
+        Log.d(TAG, "Double tap")
+    }
+}
+
+view.maxScaleReachedListener = object : GestureBitmapView.OnMaxScaleReachedListener {
+    override fun onMaxScaleReached(view: GestureBitmapView) {
+        Log.d(TAG, "Maximum scale reached: ${view.transformationParameters.scale}")
+    }
+}
+
+view.leftBoundReachedListener = object : GestureBitmapView.OnLeftBoundReachedListener {
+    override fun onLeftBoundReached(view: GestureBitmapView) {
+        // e.g. switch to the previous image of a gallery
+    }
+}
+----
+
+The view also forwards standard `View` events: a confirmed single tap calls `performClick()`, so
+`setOnClickListener` works, and a long press calls `performLongClick()` when the view is long-clickable and no pinch
+is in progress, so `setOnLongClickListener` works too.
+
+== Reading and setting the transformation
+
+[source,kotlin]
+----
+// Transformation applied by gestures on top of the base (display type) transformation
+val params: MetricTransformationParameters = view.transformationParameters
+Log.d(TAG, "scale=${params.scale} angle=${params.rotationAngle} " +
+    "tx=${params.horizontalTranslation} ty=${params.verticalTranslation}")
+
+// Set it programmatically (no scale or scroll limits are enforced here)
+view.transformationParameters = MetricTransformationParameters(
+    scale = 2.0,
+    rotationAngle = Math.PI / 4.0,
+    horizontalTranslation = 0.0,
+    verticalTranslation = 0.0
+)
+
+// Back to the initial display
+view.resetTransformationParameters()
+
+// Other read-only views of the transformation
+val base: Matrix = view.baseTransformationMatrix
+val display: Matrix = view.displayTransformationMatrix
+val visibleArea: RectF? = view.displayRect // null when no bitmap is set
+----
+
+Each getter returns a new copy, so modifying the returned `Matrix` or `MetricTransformationParameters` does not
+affect the view; assign `transformationParameters` to apply a change. Setting `transformationParameters` or calling
+`resetTransformationParameters()` cancels any running animation and redraws the view.
+
+=== Mapping touch coordinates to bitmap coordinates
+
+`displayTransformationMatrix` maps bitmap pixels to view pixels, so its inverse maps a view point back to the bitmap:
+
+[source,kotlin]
+----
+val inverse = Matrix()
+if (view.displayTransformationMatrix.invert(inverse)) {
+    val point = floatArrayOf(touchX, touchY)
+    inverse.mapPoints(point)
+    // point[0], point[1] are now bitmap pixel coordinates
+}
+----
+
+== Antialiasing
+
+Bitmaps are drawn with antialiasing by default. Disable it with `view.isAntialiasingEnabled = false`.
+
+== State saving
+
+The view saves and restores its base, gesture and display matrices, gesture flags, `displayType`, scale limits and
+margins and scroll margins across configuration changes, as long as it has an `android:id`. The bitmap itself,
+`animationDurationMillis`, `isAntialiasingEnabled` and the listeners are not saved: set them again when the activity
+or fragment is recreated.

@@ -1,0 +1,94 @@
+= Irurueta Android Gesture Bitmap View
+:stem: latexmath
+
+NOTE: This documentation was generated with the assistance of AI. Please report any inaccuracies.
+
+*irurueta-android-gesture-bitmap-view* is an Android library that provides `GestureBitmapView`, a custom
+`android.view.View` that displays a bitmap and lets the user translate (scroll), scale (zoom) and rotate it with
+touch gestures.
+
+image::video.gif[Demo of GestureBitmapView: scrolling, pinch zooming, double tap zooming and rotating an image,width=304]
+
+== Features
+
+* Display any `Bitmap` or `Drawable`, either from code or with the `app:src` XML attribute.
+* Nine initial display types (`DisplayType`) that decide how the bitmap is first fitted into the view, such as
+  `FIT_X_CENTER` (the default), `FIT_IF_BIGGER` or `CENTER_CROP`.
+* Scroll with one finger, with two fingers, or with two fingers only.
+* Pinch to zoom, with configurable minimum and maximum scale.
+* Double tap to jump in scale at the tapped location.
+* Rotate with two fingers around the point between them.
+* Fling, with an animated scroll.
+* Bounce effects: configurable margins let the bitmap go past the scale and scroll limits while the gesture lasts,
+  and it animates back into place when the fingers are lifted.
+* Listeners for bounds reached, minimum and maximum scale reached, animation completion and double taps.
+* Programmatic access to the current transformation as a `Matrix` or as `MetricTransformationParameters`
+  (scale, rotation angle and translation).
+* View state (transformation, gesture flags, display type, scale and scroll settings) survives configuration
+  changes through `onSaveInstanceState`/`onRestoreInstanceState`.
+
+== Core concepts
+
+The bitmap is drawn with a single _display_ matrix that is the composition of two transformations:
+
+[mermaid]
+....
+flowchart LR
+    B["Bitmap coordinates"] -->|"base matrix (from displayType and view size)"| I["Initially fitted bitmap"]
+    I -->|"transformation matrix (from gestures)"| D["Display coordinates"]
+....
+
+* The *base transformation* (`baseTransformationMatrix`, `baseTransformationParameters`) is computed from the
+  bitmap size, the view size and `displayType`. It is recomputed when the bitmap, the display type or the view size
+  changes.
+* The *transformation* (`transformationMatrix`, `transformationParameters`) holds the scale, rotation and
+  translation that gestures have applied on top of the base transformation. `minScale` and `maxScale` limit the
+  scale of this transformation, so a scale of `1.0` means "as initially displayed".
+* The *display transformation* (`displayTransformationMatrix`, `displayTransformationParameters`) is the product of
+  both and maps bitmap pixels to view pixels. `displayRect` is the rectangle the bitmap currently occupies in the view.
+
+All of them are metric (similarity) transformations: a uniform scale stem:[s], a rotation angle stem:[\theta] in
+radians and a translation stem:[(t_x, t_y)], represented as the 3x3 matrix
+
+[stem]
+++++
+\begin{bmatrix} s\cos\theta & -s\sin\theta & t_x \\ s\sin\theta & s\cos\theta & t_y \\ 0 & 0 & 1 \end{bmatrix}
+++++
+
+`MetricTransformationParameters` converts between this matrix form and its four parameters.
+
+== Public API at a glance
+
+[cols="1,3",options="header"]
+|===
+|Type
+|Purpose
+
+|`GestureBitmapView`
+|The view. Displays the bitmap, handles the gestures and exposes the configuration properties and listeners.
+
+|`GestureBitmapView.DisplayType`
+|How the bitmap is initially fitted into the view.
+
+|`GestureBitmapView.On*Listener`
+|Listener interfaces for the events raised by the view (see xref:usage.adoc#listeners[Listeners]).
+
+|`RotationGestureDetector`
+|Detects two-finger rotation gestures. Used internally by the view, and usable on its own.
+
+|`MetricTransformationParameters`
+|Scale, rotation angle and translation of a 2D metric transformation, convertible to and from an
+`android.graphics.Matrix`.
+
+|`InvalidMatrixException`
+|Thrown when a matrix does not represent a valid metric transformation.
+|===
+
+== Where to go next
+
+* xref:installation.adoc[Installation]: add the dependency to your project.
+* xref:usage.adoc[Usage]: add the view to a layout and control it from code.
+* xref:gestures.adoc[Gestures]: what each gesture does and how to enable or tune it.
+* xref:configuration.adoc[Configuration reference]: every property, XML attribute and default value.
+* xref:sample-app.adoc[Sample app] and xref:building.adoc[Building, testing and contributing].
+* xref:reference.adoc[Reference]: API documentation and other links.

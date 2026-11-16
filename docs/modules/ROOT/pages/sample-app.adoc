@@ -1,0 +1,62 @@
+= Sample app
+
+NOTE: This documentation was generated with the assistance of AI. Please report any inaccuracies.
+
+The repository's `app/` module is a minimal application (`com.irurueta.android.gesturebitmap.app`) that depends on the
+`lib` module through `implementation(project(":lib"))`. It shows the simplest possible integration: a single activity
+whose layout contains a full-screen `GestureBitmapView` with all settings left at their defaults. The demo animation
+on the xref:index.adoc[overview page] was recorded with it.
+
+== Layout
+
+`app/src/main/res/layout/activity_main.xml`:
+
+[source,xml]
+----
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".MainActivity">
+
+    <com.irurueta.android.gesturebitmap.GestureBitmapView
+        android:id="@+id/gesture_bitmap"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:src="@drawable/image"/>
+
+</androidx.constraintlayout.widget.ConstraintLayout>
+----
+
+The image comes from `app/src/main/res/drawable/image.jpeg` through `app:src`, so no Kotlin code is needed to set it.
+
+== Activity
+
+`app/src/main/java/com/irurueta/android/gesturebitmap/app/MainActivity.kt`:
+
+[source,kotlin]
+----
+class MainActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        supportActionBar?.hide()
+        setContentView(R.layout.activity_main)
+    }
+}
+----
+
+== Running it
+
+Connect a device or start an emulator (API 26 or later), then from the repository root:
+
+[source,bash]
+----
+./gradlew :app:installDebug
+----
+
+or open the project in Android Studio and run the `app` configuration. Try dragging, flinging, pinching, double
+tapping and rotating with two fingers; see xref:gestures.adoc[Gestures] for what each one does.
+
+To experiment with other settings, add attributes from the xref:configuration.adoc#xml-attributes[XML attributes]
+table to the layout, for example `app:displayType="center_crop"` or `app:rotationEnabled="false"`.

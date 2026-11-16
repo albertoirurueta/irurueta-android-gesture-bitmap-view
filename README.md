@@ -1,52 +1,97 @@
 # irurueta-android-gesture-bitmap-view
 
 A touch gesture capable Android view to display bitmaps and perform scaling, translation and
-rotation on the bitmap
+rotation on the bitmap.
 
-[![Build Status](https://github.com/albertoirurueta/irurueta-android-gesture-bitmap-view/actions/workflows/main.yml/badge.svg)](https://github.com/albertoirurueta/irurueta-android-gesture-bitmap-view/actions)
+[![Release](https://github.com/albertoirurueta/irurueta-android-gesture-bitmap-view/actions/workflows/main.yml/badge.svg)](https://github.com/albertoirurueta/irurueta-android-gesture-bitmap-view/actions/workflows/main.yml)
+[![Develop](https://github.com/albertoirurueta/irurueta-android-gesture-bitmap-view/actions/workflows/develop.yml/badge.svg?branch=develop)](https://github.com/albertoirurueta/irurueta-android-gesture-bitmap-view/actions/workflows/develop.yml)
+[![Security](https://github.com/albertoirurueta/irurueta-android-gesture-bitmap-view/actions/workflows/security.yml/badge.svg)](https://github.com/albertoirurueta/irurueta-android-gesture-bitmap-view/actions/workflows/security.yml)
 
-[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=albertoirurueta_irurueta-android-gesture-bitmap-view&metric=code_smells)](https://sonarcloud.io/dashboard?id=albertoirurueta_irurueta-android-gesture-bitmap-view)
-[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=albertoirurueta_irurueta-android-gesture-bitmap-view&metric=coverage)](https://sonarcloud.io/dashboard?id=albertoirurueta_irurueta-android-gesture-bitmap-view)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=albertoirurueta_irurueta-android-gesture-bitmap-view&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=albertoirurueta_irurueta-android-gesture-bitmap-view)
+[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=albertoirurueta_irurueta-android-gesture-bitmap-view&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=albertoirurueta_irurueta-android-gesture-bitmap-view)
+[![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=albertoirurueta_irurueta-android-gesture-bitmap-view&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=albertoirurueta_irurueta-android-gesture-bitmap-view)
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=albertoirurueta_irurueta-android-gesture-bitmap-view&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=albertoirurueta_irurueta-android-gesture-bitmap-view)
+[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=albertoirurueta_irurueta-android-gesture-bitmap-view&metric=bugs)](https://sonarcloud.io/summary/new_code?id=albertoirurueta_irurueta-android-gesture-bitmap-view)
+[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=albertoirurueta_irurueta-android-gesture-bitmap-view&metric=code_smells)](https://sonarcloud.io/summary/new_code?id=albertoirurueta_irurueta-android-gesture-bitmap-view)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=albertoirurueta_irurueta-android-gesture-bitmap-view&metric=coverage)](https://sonarcloud.io/summary/new_code?id=albertoirurueta_irurueta-android-gesture-bitmap-view)
+[![Duplicated Lines (%)](https://sonarcloud.io/api/project_badges/measure?project=albertoirurueta_irurueta-android-gesture-bitmap-view&metric=duplicated_lines_density)](https://sonarcloud.io/summary/new_code?id=albertoirurueta_irurueta-android-gesture-bitmap-view)
+[![Lines of Code](https://sonarcloud.io/api/project_badges/measure?project=albertoirurueta_irurueta-android-gesture-bitmap-view&metric=ncloc)](https://sonarcloud.io/summary/new_code?id=albertoirurueta_irurueta-android-gesture-bitmap-view)
+[![Technical Debt](https://sonarcloud.io/api/project_badges/measure?project=albertoirurueta_irurueta-android-gesture-bitmap-view&metric=sqale_index)](https://sonarcloud.io/summary/new_code?id=albertoirurueta_irurueta-android-gesture-bitmap-view)
+[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=albertoirurueta_irurueta-android-gesture-bitmap-view&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=albertoirurueta_irurueta-android-gesture-bitmap-view)
 
-[![Duplicated lines](https://sonarcloud.io/api/project_badges/measure?project=albertoirurueta_irurueta-android-gesture-bitmap-view&metric=duplicated_lines_density)](https://sonarcloud.io/dashboard?id=albertoirurueta_irurueta-android-gesture-bitmap-view)
-[![Lines of code](https://sonarcloud.io/api/project_badges/measure?project=albertoirurueta_irurueta-android-gesture-bitmap-view&metric=ncloc)](https://sonarcloud.io/dashboard?id=albertoirurueta_irurueta-android-gesture-bitmap-view)
+[![Maven Central](https://img.shields.io/maven-central/v/com.irurueta/irurueta-android-gesture-bitmap-view)](https://central.sonatype.com/artifact/com.irurueta/irurueta-android-gesture-bitmap-view)
 
-[![Maintainability](https://sonarcloud.io/api/project_badges/measure?project=albertoirurueta_irurueta-android-gesture-bitmap-view&metric=sqale_rating)](https://sonarcloud.io/dashboard?id=albertoirurueta_irurueta-android-gesture-bitmap-view)
-[![Quality gate](https://sonarcloud.io/api/project_badges/measure?project=albertoirurueta_irurueta-android-gesture-bitmap-view&metric=alert_status)](https://sonarcloud.io/dashboard?id=albertoirurueta_irurueta-android-gesture-bitmap-view)
-[![Reliability](https://sonarcloud.io/api/project_badges/measure?project=albertoirurueta_irurueta-android-gesture-bitmap-view&metric=reliability_rating)](https://sonarcloud.io/dashboard?id=albertoirurueta_irurueta-android-gesture-bitmap-view)
+## Project Status
 
-[![Security](https://sonarcloud.io/api/project_badges/measure?project=albertoirurueta_irurueta-android-gesture-bitmap-view&metric=security_rating)](https://sonarcloud.io/dashboard?id=albertoirurueta_irurueta-android-gesture-bitmap-view)
-[![Technical debt](https://sonarcloud.io/api/project_badges/measure?project=albertoirurueta_irurueta-android-gesture-bitmap-view&metric=sqale_index)](https://sonarcloud.io/dashboard?id=albertoirurueta_irurueta-android-gesture-bitmap-view)
-[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=albertoirurueta_irurueta-android-gesture-bitmap-view&metric=vulnerabilities)](https://sonarcloud.io/dashboard?id=albertoirurueta_irurueta-android-gesture-bitmap-view)
+| Item | Value |
+| --- | --- |
+| Language | Kotlin 2.3.10 (JVM target 17) |
+| Build tool | Gradle 9.4.0 (Kotlin DSL) |
+| Latest release | `1.2.7` |
+| Platform | Android |
+| Min / compile SDK | `minSdk` 26 (Android 8.0) / `compileSdk` 36 |
+| Kotlin / AGP | Kotlin 2.3.10 / Android Gradle Plugin 9.0.1 |
+| License | Apache License 2.0 |
+| CI | GitHub Actions: `develop` builds (tests, Lint, SonarCloud, docs, snapshot publish), releases (Maven Central publish and GitHub Pages docs) and weekly security scans |
+| Quality | SonarCloud, JaCoCo coverage, Android Lint |
+| Distribution | Maven Central (`com.irurueta:irurueta-android-gesture-bitmap-view`) |
 
-[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.irurueta/irurueta-android-gesture-bitmap-view/badge.svg)](https://search.maven.org/artifact/com.irurueta/irurueta-android-gesture-bitmap-view/1.0.0/aar)
+## Documentation
 
-[API Documentation](http://albertoirurueta.github.io/irurueta-android-gesture-bitmap-view)
+- [Documentation site](https://albertoirurueta.github.io/irurueta-android-gesture-bitmap-view) (Antora): installation,
+  usage, configuration reference, gestures, sample app and building instructions.
+- [API documentation](https://albertoirurueta.github.io/irurueta-android-gesture-bitmap-view/api/) (Dokka).
+- [SonarCloud dashboard](https://sonarcloud.io/summary/new_code?id=albertoirurueta_irurueta-android-gesture-bitmap-view).
+- [Changelog](CHANGELOG.md).
 
 ## Overview
 
-This library contains a view that can display a bitmap an handle touch gestures to translate, scale
-and rotate displayed bitmap.
+This library contains a view that can display a bitmap and handle touch gestures to translate, scale
+and rotate the displayed bitmap.
 
 ![Demo](docs/video.gif)
 
+## Installation
+
+The library is published to Maven Central. Make sure `mavenCentral()` is among your repositories and add the
+dependency to your module's `build.gradle.kts`:
+
+Latest release:
+
+```kotlin
+dependencies {
+    implementation("com.irurueta:irurueta-android-gesture-bitmap-view:1.2.7")
+}
+```
+
+The Installation page of the [documentation site](https://albertoirurueta.github.io/irurueta-android-gesture-bitmap-view)
+also covers the Groovy DSL and version catalog forms.
+
 ## Usage
-
-Add the following dependency to your project:
-
-```
-implementation 'com.irurueta:irurueta-android-gesture-bitmap-view:1.2.7'
-```
 
 The view can be added to your xml layout as the example below:
 
+```xml
+<com.irurueta.android.gesturebitmap.GestureBitmapView
+    android:id="@+id/gesture_bitmap"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    app:src="@drawable/image"/>
 ```
-    <com.irurueta.android.gesturebitmap.GestureBitmapView
-        android:id="@+id/gesture_bitmap"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        app:src="@drawable/image"/>
+
+Or configured from code:
+
+```kotlin
+val view = findViewById<GestureBitmapView>(R.id.gesture_bitmap)
+view.displayType = GestureBitmapView.DisplayType.CENTER_CROP
+view.rotationEnabled = false
+view.maxScale = 5.0f
+
+// resets scale, rotation and translation for the new bitmap
+view.bitmap = bitmap
 ```
+
+Note that setting a new bitmap recycles the bitmap previously held by the view.
 
 The following properties are supported in xml layouts:
 
@@ -69,7 +114,7 @@ The following properties are supported in xml layouts:
       Bitmap is horizontally centered.
     - **center_crop**: bitmap is initially scaled to fill the whole view and centered on the view
       while preserving aspect ratio.
-- **animationDurationMillis**: duration of animations when doing smoooth scaling or translation and
+- **animationDurationMillis**: duration of animations when doing smooth scaling or translation and
   expressed in milliseconds.
 - **rotationEnabled**: indicates whether the view handles rotation gestures with two fingers. If
   false, bitmap rotations are not allowed.
@@ -112,51 +157,59 @@ The following properties are supported in xml layouts:
   while scrolling. A positive value can be used to make a bouncing effect, so that bitmap bounces
   back to the bottom side when bottom boundary is reached.
 
+See the Configuration page of the [documentation site](https://albertoirurueta.github.io/irurueta-android-gesture-bitmap-view)
+for default values and the corresponding Kotlin properties and listeners.
 
 ## Additional details
 
 This library is contained within the `lib` module in source code.
 `app` module contains an example of an application using the view contained in the `lib` module.
 
-### Gradle taks
+### Gradle tasks
 
 To execute all unit tests, execute:
 
 ```
-gradlew test
+./gradlew test
 ```
 
 To execute all instrumentation tests, first make sure you have connected a device or emulator and
 execute:
 
 ```
-gradlew connectedAndroidTest
+./gradlew connectedAndroidTest
 ```
 
 If you only want to run tests of a specific module, execute:
 
 ```
-gradlew lib:test
+./gradlew lib:test
 ```
 
 or
 
 ```
-gradlew lib:connectedAndroidTest
+./gradlew lib:connectedAndroidTest
 ```
 
 where "lib" is the name of the library module in the project
 
-To generate documentation, run:
+To generate API documentation (Dokka), run:
 
 ```
-gradlew dokkaHtml
+./gradlew lib:dokkaGenerate
 ```
 
-To execute sonarqube, run:
+To build the documentation site, run:
 
 ```
-gradlew sonarqube
+cd docs && npx antora antora-playbook.yml
+```
+
+To execute SonarCloud analysis, run:
+
+```
+./gradlew :lib:sonar
 ```
 
 To convert exec files to xml and html reports:
@@ -168,3 +221,6 @@ java -jar jacoco-0.8.13/lib/jacococli.jar report lib/build/jacoco/testReleaseUni
 Github actions to release library in maven central has been configured following:
 [https://getstream.io/blog/publishing-libraries-to-mavencentral-2021/](https://getstream.io/blog/publishing-libraries-to-mavencentral-2021/)
 
+## License
+
+This project is licensed under the Apache License 2.0. See [LICENSE](LICENSE).

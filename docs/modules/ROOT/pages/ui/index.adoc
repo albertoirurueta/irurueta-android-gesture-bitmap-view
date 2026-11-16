@@ -1,0 +1,36 @@
+= User interface
+
+NOTE: This documentation was generated with the assistance of AI. Please report any inaccuracies.
+
+The library's only user-facing element is the `GestureBitmapView` component. The repository's `app/` module is a
+sample application with a single screen that hosts the view full screen (see xref:sample-app.adoc[Sample app]).
+
+== Screens
+
+[cols="1,3,2",options="header"]
+|===
+|Screen |Purpose |Entry point
+
+|`MainActivity` (sample app)
+|Displays `app/src/main/res/drawable/image.jpeg` in a full-screen `GestureBitmapView` with the default settings.
+|Launcher activity of the `app` module.
+|===
+
+== Components
+
+[cols="1,3,2",options="header"]
+|===
+|Component |Purpose |Used by
+
+|`GestureBitmapView`
+|View used to display a bitmap allowing gestures to change view zooming, panning and rotation.
+|`MainActivity` (sample app); `GestureBitmapViewActivity` (instrumented tests).
+|===
+
+== Accessibility
+
+The repository's `.ui-quality.yml` sets `accessibility: enforce`: automated accessibility checks run with the UI
+tests and violations fail them. Screenshots are captured in left-to-right and right-to-left directions and in light
+and dark themes.
+
+Navigation between screens is described in xref:ui/navigation.adoc[Navigation flows].

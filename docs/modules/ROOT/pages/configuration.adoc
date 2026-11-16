@@ -1,0 +1,248 @@
+= Configuration reference
+
+NOTE: This documentation was generated with the assistance of AI. Please report any inaccuracies.
+
+Every `GestureBitmapView` setting, its XML attribute (if any), its default value and its constraints. Defaults come
+from the constants in `GestureBitmapView.Companion` and the property initializers.
+
+== Properties
+
+[cols="2,1,1,4",options="header"]
+|===
+|Property |Type |Default |Description
+
+|`bitmap`
+|`Bitmap?`
+|`null`
+|Bitmap to display. Setting it resets the transformation; the previously held bitmap is recycled. See also
+`setBitmap(bitmap, resetMatrices)` and `setDrawable(drawable)`.
+
+|`displayType`
+|`DisplayType`
+|`FIT_X_CENTER`
+|How the bitmap is initially fitted into the view. Changing it keeps the current on-screen display.
+
+|`animationDurationMillis`
+|`Long`
+|`200`
+|Duration of the scale, scroll and rotate-and-translate animations, in milliseconds. Also used to compute the fling
+distance.
+
+|`scrollEnabled`
+|`Boolean`
+|`true`
+|Whether scroll and fling gestures move the bitmap.
+
+|`twoFingerScrollEnabled`
+|`Boolean`
+|`true`
+|Whether scrolling can be done with two fingers.
+
+|`exclusiveTwoFingerScrollEnabled`
+|`Boolean`
+|`false`
+|When `true` with `scrollEnabled` and `twoFingerScrollEnabled`, scrolling requires two fingers. When `true` with
+`twoFingerScrollEnabled = false`, scrolling requires exactly one finger.
+
+|`scaleEnabled`
+|`Boolean`
+|`true`
+|Whether pinch gestures scale the bitmap.
+
+|`doubleTapEnabled`
+|`Boolean`
+|`true`
+|Whether a double tap jumps in scale.
+
+|`rotationEnabled`
+|`Boolean`
+|`true`
+|Whether two-finger rotation gestures rotate the bitmap.
+
+|`minScale`
+|`Float`
+|`1.0`
+|Minimum scale, relative to the initial display. Must be greater than 0, otherwise `IllegalArgumentException`.
+
+|`maxScale`
+|`Float`
+|`10.0`
+|Maximum scale, relative to the initial display. Must be greater than 0, otherwise `IllegalArgumentException`.
+
+|`scaleFactorJump`
+|`Float`
+|`3.0`
+|Amount added to the scale on each double tap. Must be at least 1, otherwise `IllegalArgumentException`.
+
+|`minScaleMargin`
+|`Float`
+|`0.1`
+|How far below `minScale` a pinch can go before bouncing back.
+
+|`maxScaleMargin`
+|`Float`
+|`1.0`
+|How far above `maxScale` a pinch can go before bouncing back.
+
+|`leftScrollMargin`
+|`Float`
+|`100.0`
+|Overshoot allowed past the left limit while scrolling, in pixels. Must not be negative, otherwise
+`IllegalArgumentException`.
+
+|`topScrollMargin`
+|`Float`
+|`100.0`
+|Overshoot allowed past the top limit, in pixels. Must not be negative.
+
+|`rightScrollMargin`
+|`Float`
+|`100.0`
+|Overshoot allowed past the right limit, in pixels. Must not be negative.
+
+|`bottomScrollMargin`
+|`Float`
+|`100.0`
+|Overshoot allowed past the bottom limit, in pixels. Must not be negative.
+
+|`isAntialiasingEnabled`
+|`Boolean`
+|`true`
+|Whether the bitmap is drawn with antialiasing.
+
+|`transformationParameters`
+|`MetricTransformationParameters`
+|identity
+|Scale, rotation and translation applied on top of the base transformation. Setting it enforces no limits.
+|===
+
+=== Read-only properties
+
+[cols="2,1,4",options="header"]
+|===
+|Property |Type |Description
+
+|`transformationMatrix` |`Matrix` |Copy of the matrix form of `transformationParameters`.
+|`baseTransformationParameters` |`MetricTransformationParameters` |Transformation applied by `displayType`.
+|`baseTransformationMatrix` |`Matrix` |Copy of the matrix form of `baseTransformationParameters`.
+|`displayTransformationParameters` |`MetricTransformationParameters` |Overall transformation from bitmap to view
+coordinates (base and gesture transformations combined).
+|`displayTransformationMatrix` |`Matrix` |Copy of the matrix form of `displayTransformationParameters`.
+|`displayRect` |`RectF?` |Rectangle occupied by the bitmap in view coordinates, or `null` when no bitmap is set.
+|===
+
+=== Listener properties
+
+`topBoundReachedListener`, `bottomBoundReachedListener`, `leftBoundReachedListener`, `rightBoundReachedListener`,
+`minScaleReachedListener`, `maxScaleReachedListener`, `scaleAnimationCompletedListener`,
+`scrollAnimationCompletedListener`, `rotateAndTranslateAnimationCompletedListener` and `doubleTapListener`, all
+`null` by default. See xref:usage.adoc#listeners[Listeners].
+
+== Methods
+
+[cols="2,4",options="header"]
+|===
+|Method |Description
+
+|`setBitmap(bitmap: Bitmap?, resetMatrices: Boolean = true)`
+|Sets the bitmap, recycling the previous one. With `resetMatrices = false` the current transformation is kept.
+
+|`setDrawable(drawable: Drawable?)`
+|Sets the bitmap from a drawable at its intrinsic size.
+
+|`resetTransformationParameters()`
+|Cancels animations and resets the gesture transformation, returning to the initial display.
+|===
+
+[#xml-attributes]
+== XML attributes
+
+Declared in `lib/src/main/res/values/attrs.xml` (styleable `GestureBitmapView`). Use them with the `app:` namespace
+(`xmlns:app="http://schemas.android.com/apk/res-auto"`). Each one sets the property of the same name.
+
+[cols="2,1,4",options="header"]
+|===
+|Attribute |Format |Property / values
+
+|`app:src` |reference |Drawable passed to `setDrawable`.
+|`app:displayType` |enum |`none`, `fit_if_bigger`, `fit_x_top`, `fit_x_bottom`, `fit_x_center`, `fit_y_left`,
+`fit_y_right`, `fit_y_center`, `center_crop` (see xref:usage.adoc#_choosing_a_display_type[display types]).
+|`app:animationDurationMillis` |integer |`animationDurationMillis`
+|`app:rotationEnabled` |boolean |`rotationEnabled`
+|`app:scaleEnabled` |boolean |`scaleEnabled`
+|`app:scrollEnabled` |boolean |`scrollEnabled`
+|`app:twoFingerScrollEnabled` |boolean |`twoFingerScrollEnabled`
+|`app:exclusiveTwoFingerScrollEnabled` |boolean |`exclusiveTwoFingerScrollEnabled`
+|`app:doubleTapEnabled` |boolean |`doubleTapEnabled`
+|`app:minScale` |float |`minScale`
+|`app:maxScale` |float |`maxScale`
+|`app:scaleFactorJump` |float |`scaleFactorJump`
+|`app:minScaleMargin` |float |`minScaleMargin`
+|`app:maxScaleMargin` |float |`maxScaleMargin`
+|`app:leftScrollMargin` |float |`leftScrollMargin`
+|`app:topScrollMargin` |float |`topScrollMargin`
+|`app:rightScrollMargin` |float |`rightScrollMargin`
+|`app:bottomScrollMargin` |float |`bottomScrollMargin`
+|===
+
+`bitmap` (other than through `app:src`), `isAntialiasingEnabled`, `transformationParameters` and the listeners can only
+be set from code.
+
+== Default constants
+
+`GestureBitmapView` exposes its defaults as public constants in its companion object:
+
+[cols="2,1",options="header"]
+|===
+|Constant |Value
+
+|`DEFAULT_ANIMATION_DURATION_MILLIS` |`200L`
+|`DEFAULT_MIN_SCALE` |`1.0f`
+|`DEFAULT_MAX_SCALE` |`10.0f`
+|`DEFAULT_SCALE_FACTOR_JUMP` |`3.0f`
+|`DEFAULT_MIN_SCALE_MARGIN` |`0.1f`
+|`DEFAULT_MAX_SCALE_MARGIN` |`1.0f`
+|`DEFAULT_SCROLL_MARGIN` |`100.0f`
+|===
+
+== MetricTransformationParameters
+
+`data class MetricTransformationParameters(var scale: Double = 1.0, var rotationAngle: Double = 0.0,
+var horizontalTranslation: Double = 0.0, var verticalTranslation: Double = 0.0) : Serializable`
+
+`rotationAngle` is expressed in radians.
+
+[cols="2,4",options="header"]
+|===
+|Member |Description
+
+|`fromMatrix(matrix, assumePositiveScale = true)`
+|Fills this instance from a `Matrix`. Throws `InvalidMatrixException` if the matrix is not a metric transformation.
+`assumePositiveScale` resolves the sign ambiguity between scale and a 180-degree rotation.
+
+|`toMatrix(result: Matrix)` / `toMatrix(): Matrix`
+|Writes this instance into a matrix, or returns a new one.
+
+|`MetricTransformationParameters.fromMatrix(matrix, result, assumePositiveScale = true)`
+|Static form writing into `result`.
+
+|`MetricTransformationParameters.fromMatrix(matrix, assumePositiveScale = true)`
+|Static form returning a new instance.
+
+|`MetricTransformationParameters.toMatrix(parameters, result)` / `toMatrix(parameters)`
+|Static forms of `toMatrix`.
+
+|`MetricTransformationParameters.MATRIX_VALUES_LENGTH`
+|`9`, the number of values in a 3x3 `Matrix`.
+|===
+
+[source,kotlin]
+----
+val params = MetricTransformationParameters.fromMatrix(view.displayTransformationMatrix)
+val matrix = MetricTransformationParameters(scale = 2.0).toMatrix()
+----
+
+== InvalidMatrixException
+
+`class InvalidMatrixException : RuntimeException()`. Thrown by `MetricTransformationParameters.fromMatrix` when the
+matrix has perspective terms, unequal scale on both axes, shear, or a zero homogeneous scale.

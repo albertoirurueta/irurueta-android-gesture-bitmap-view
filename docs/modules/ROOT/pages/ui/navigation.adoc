@@ -1,0 +1,14 @@
+= Navigation flows
+
+NOTE: This documentation was generated with the assistance of AI. Please report any inaccuracies.
+
+The sample app has a single screen, so there is no navigation between screens: launching the app opens
+`MainActivity`, and every interaction (scroll, fling, pinch, double tap, rotation) happens inside its
+`GestureBitmapView`.
+
+[mermaid]
+....
+flowchart LR
+    L(["App launch"]) --> M["MainActivity: full-screen GestureBitmapView"]
+    M -->|"scroll, fling, pinch, double tap, rotate"| M
+....

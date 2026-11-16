@@ -1,0 +1,79 @@
+= Installation
+
+NOTE: This documentation was generated with the assistance of AI. Please report any inaccuracies.
+
+The library is published to Maven Central as an Android library (AAR).
+
+[cols="1,3"]
+|===
+|Group ID |`com.irurueta`
+|Artifact ID |`irurueta-android-gesture-bitmap-view`
+|Latest release |`1.2.7`
+|License |Apache License 2.0
+|===
+
+== Requirements
+
+* Android `minSdk` 26 (Android 8.0) or later.
+* The library is compiled against SDK 36 with Java/Kotlin JVM target 17.
+
+== Gradle (Kotlin DSL)
+
+Make sure `mavenCentral()` is among your repositories (in `settings.gradle.kts`):
+
+[source,kotlin]
+----
+dependencyResolutionManagement {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+----
+
+Then add the dependency to your module's `build.gradle.kts`.
+
+Latest release:
+
+[source,kotlin]
+----
+dependencies {
+    implementation("com.irurueta:irurueta-android-gesture-bitmap-view:1.2.7")
+}
+----
+
+== Gradle (Groovy DSL)
+
+Latest release:
+
+[source,groovy]
+----
+dependencies {
+    implementation 'com.irurueta:irurueta-android-gesture-bitmap-view:1.2.7'
+}
+----
+
+== Version catalog
+
+[source,toml]
+----
+[versions]
+gestureBitmapView = "1.2.7"
+
+[libraries]
+gesture-bitmap-view = { module = "com.irurueta:irurueta-android-gesture-bitmap-view", version.ref = "gestureBitmapView" }
+----
+
+[source,kotlin]
+----
+dependencies {
+    implementation(libs.gesture.bitmap.view)
+}
+----
+
+== Building from source
+
+To use the library from source instead, clone the repository and include the `lib` module in your build, or publish
+it to your local Maven repository. See xref:building.adoc[Building, testing and contributing].
+
+Next: xref:usage.adoc[Usage].
