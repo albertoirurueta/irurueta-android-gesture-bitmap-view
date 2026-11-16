@@ -1281,6 +1281,7 @@ class GestureBitmapViewTest {
         assertTrue(scrollAnimationCompleted > 0)
     }
 
+    @RequiresRealDevice
     @Test
     fun dragIntoOverscrollMargin_whenRepeated_returnsToLimitsEveryTime() {
         val view = this.view ?: return fail()
@@ -1335,6 +1336,7 @@ class GestureBitmapViewTest {
         }
     }
 
+    @RequiresRealDevice
     @Test
     fun pinchGesture_modifiesScale() {
         val view = this.view ?: return fail()
