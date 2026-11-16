@@ -7,6 +7,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Tension overscroll: when dragging past a scroll limit, movement is progressively slowed down and asymptotically
+  approaches the scroll margin instead of following the finger 1:1 until a hard stop. Enabled by default and
+  configurable with `scrollTensionEnabled` / `app:scrollTensionEnabled`. The amount of resistance can be adjusted with
+  `scrollTension` / `app:scrollTension` (default `1.0`, linear; larger is stiffer, `0` disables it). Margins are the maximum overshoot. Fling,
+  `smoothScrollBy` and the release bounce back are unchanged.
+
 ### Changed
 
 - Redraws caused by gestures and animations are requested with `invalidate()` instead of `postInvalidate()`, so that

@@ -29,5 +29,7 @@
         <attr name="topScrollMargin" format="float"/>
         <attr name="rightScrollMargin" format="float"/>
         <attr name="bottomScrollMargin" format="float"/>
+        <attr name="scrollTensionEnabled" format="boolean"/>
+        <attr name="scrollTension" format="float"/>
     </declare-styleable>
 </resources>

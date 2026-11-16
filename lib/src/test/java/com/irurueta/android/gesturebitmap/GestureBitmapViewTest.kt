@@ -43,6 +43,7 @@ import io.mockk.impl.annotations.MockK
 import io.mockk.junit4.MockKRule
 import org.junit.After
 import org.junit.Before
+import kotlin.math.abs
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -269,6 +270,18 @@ class GestureBitmapViewTest {
                 any()
             )
         }.returns(200.0f)
+        every {
+            typedArray.getBoolean(
+                R.styleable.GestureBitmapView_scrollTensionEnabled,
+                any()
+            )
+        }.returns(false)
+        every {
+            typedArray.getFloat(
+                R.styleable.GestureBitmapView_scrollTension,
+                any()
+            )
+        }.returns(2.5f)
 
         justRun { typedArray.recycle() }
 
@@ -295,6 +308,8 @@ class GestureBitmapViewTest {
         assertEquals(150.0f, view.topScrollMargin, 0.0f)
         assertEquals(175.0f, view.rightScrollMargin, 0.0f)
         assertEquals(200.0f, view.bottomScrollMargin, 0.0f)
+        assertFalse(view.scrollTensionEnabled)
+        assertEquals(2.5f, view.scrollTension, 0.0f)
         verify(exactly = 2) { typedArray.recycle() }
 
         assertTrue(view.isAntialiasingEnabled)
@@ -2750,6 +2765,9 @@ class GestureBitmapViewTest {
         assertEquals(view.topScrollMargin, bundle.getFloat(TOP_SCROLL_MARGIN_KEY), 0.0f)
         assertEquals(view.rightScrollMargin, bundle.getFloat(RIGHT_SCROLL_MARGIN_KEY), 0.0f)
         assertEquals(view.bottomScrollMargin, bundle.getFloat(BOTTOM_SCROLL_MARGIN_KEY), 0.0f)
+        assertTrue(bundle.containsKey(SCROLL_TENSION_ENABLED_KEY))
+        assertEquals(view.scrollTensionEnabled, bundle.getBoolean(SCROLL_TENSION_ENABLED_KEY))
+        assertEquals(view.scrollTension, bundle.getFloat(SCROLL_TENSION_KEY), 0.0f)
     }
 
     @Test
@@ -2816,6 +2834,8 @@ class GestureBitmapViewTest {
         bundle.putFloat(TOP_SCROLL_MARGIN_KEY, 102.0f)
         bundle.putFloat(RIGHT_SCROLL_MARGIN_KEY, 103.0f)
         bundle.putFloat(BOTTOM_SCROLL_MARGIN_KEY, 104.0f)
+        bundle.putBoolean(SCROLL_TENSION_ENABLED_KEY, false)
+        bundle.putFloat(SCROLL_TENSION_KEY, 3.0f)
 
         // restore state
         view.callPrivateFunc("onRestoreInstanceState", bundle)
@@ -2840,6 +2860,8 @@ class GestureBitmapViewTest {
         assertEquals(102.0f, view.topScrollMargin, 0.0f)
         assertEquals(103.0f, view.rightScrollMargin, 0.0f)
         assertEquals(104.0f, view.bottomScrollMargin, 0.0f)
+        assertFalse(view.scrollTensionEnabled)
+        assertEquals(3.0f, view.scrollTension, 0.0f)
     }
 
     @Test
@@ -4657,6 +4679,241 @@ class GestureBitmapViewTest {
     }
 
     @Test
+    fun scrollTensionEnabled_returnsExpectedValue() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val view = GestureBitmapView(context)
+
+        // check default value
+        assertTrue(view.scrollTensionEnabled)
+
+        // set new value
+        view.scrollTensionEnabled = false
+
+        // check
+        assertFalse(view.scrollTensionEnabled)
+    }
+
+    @Test
+    fun scrollTension_returnsExpectedValue() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val view = GestureBitmapView(context)
+
+        // check default value
+        assertEquals(GestureBitmapView.DEFAULT_SCROLL_TENSION, view.scrollTension, 0.0f)
+
+        // set new values
+        view.scrollTension = 2.0f
+        assertEquals(2.0f, view.scrollTension, 0.0f)
+        view.scrollTension = 0.0f
+        assertEquals(0.0f, view.scrollTension, 0.0f)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun scrollTension_whenNegative_throwsIllegalArgumentException() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val view = GestureBitmapView(context)
+
+        view.scrollTension = -1.0f
+    }
+
+    @Test
+    fun gestureScroll_whenOverscrolled_appliesConfiguredTension() {
+        // overscroll of 50 px with default margin of 100 px: resistance (1 - 0.5)^tension
+        val expected = mapOf(
+            0.0f to 10.0,
+            0.5f to 10.0 * Math.sqrt(0.5),
+            1.0f to 5.0,
+            2.0f to 2.5
+        )
+        for ((tension, step) in expected) {
+            val (view, listener, event) = createScrollableView(50.0, 50.0)
+            view.scrollTension = tension
+
+            assertTrue(listener.onScroll(event, event, -10.0f, -10.0f))
+
+            val params = view.transformationParameters
+            assertEquals(50.0 + step, params.horizontalTranslation, 1e-3)
+            assertEquals(50.0 + step, params.verticalTranslation, 1e-3)
+        }
+    }
+
+    @Test
+    fun gestureScroll_whenHigherTension_overscrollsLess() {
+        var previousOverscroll = Double.MAX_VALUE
+        for (tension in floatArrayOf(0.5f, 1.0f, 2.0f, 4.0f)) {
+            val (view, listener, event) = createScrollableView(0.0, 0.0)
+            view.scrollTension = tension
+
+            for (i in 0 until 5) {
+                assertTrue(listener.onScroll(event, event, -20.0f, 0.0f))
+            }
+
+            val overscroll = view.transformationParameters.horizontalTranslation
+            assertTrue(overscroll > 0.0)
+            assertTrue(overscroll < GestureBitmapView.DEFAULT_SCROLL_MARGIN)
+            assertTrue(overscroll < previousOverscroll)
+            previousOverscroll = overscroll
+        }
+    }
+
+    @Test
+    fun gestureScroll_whenZeroTension_hardClampsToMargin() {
+        val (view, listener, event) = createScrollableView(90.0, 90.0)
+        view.scrollTension = 0.0f
+
+        assertTrue(listener.onScroll(event, event, -50.0f, -50.0f))
+
+        val params = view.transformationParameters
+        assertEquals(GestureBitmapView.DEFAULT_SCROLL_MARGIN.toDouble(), params.horizontalTranslation, 1e-3)
+        assertEquals(GestureBitmapView.DEFAULT_SCROLL_MARGIN.toDouble(), params.verticalTranslation, 1e-3)
+    }
+
+    @Test
+    fun gestureScroll_whenInsideLimits_movesOneToOne() {
+        val (view, listener, event) = createScrollableView(0.0, 0.0)
+
+        assertTrue(listener.onScroll(event, event, -30.0f, -40.0f))
+
+        val params = view.transformationParameters
+        assertEquals(30.0, params.horizontalTranslation, 1e-3)
+        assertEquals(40.0, params.verticalTranslation, 1e-3)
+    }
+
+    @Test
+    fun gestureScroll_whenTensionEnabled_resistanceIncreasesAndNeverExceedsMargin() {
+        // left, top, right and bottom sides. Each case: start translation and scroll distance
+        val cases = listOf(
+            doubleArrayOf(0.0, 0.0, -20.0, 0.0),
+            doubleArrayOf(0.0, 0.0, 0.0, -20.0),
+            doubleArrayOf(-1080.0, 0.0, 20.0, 0.0),
+            doubleArrayOf(0.0, -1920.0, 0.0, 20.0)
+        )
+        for (case in cases) {
+            val (view, listener, event) = createScrollableView(case[0], case[1])
+            val horizontal = case[2] != 0.0
+
+            var previous = view.transformationParameters
+            var previousStep = Double.MAX_VALUE
+            for (i in 0 until 12) {
+                assertTrue(listener.onScroll(event, event, case[2].toFloat(), case[3].toFloat()))
+                val current = view.transformationParameters
+                val step = if (horizontal) {
+                    abs(current.horizontalTranslation - previous.horizontalTranslation)
+                } else {
+                    abs(current.verticalTranslation - previous.verticalTranslation)
+                }
+                assertTrue(step > 0.0)
+                assertTrue(step <= previousStep)
+                if (i > 5) {
+                    // once beyond the bound steps strictly decrease
+                    assertTrue(step < previousStep)
+                }
+                previousStep = step
+                previous = current
+            }
+
+            val overscroll = if (horizontal) {
+                abs(previous.horizontalTranslation - case[0])
+            } else {
+                abs(previous.verticalTranslation - case[1])
+            }
+            assertTrue(overscroll < GestureBitmapView.DEFAULT_SCROLL_MARGIN)
+            assertTrue(overscroll > 0.0)
+        }
+    }
+
+    @Test
+    fun gestureScroll_whenOverscrolledAndMovingInwards_movesOneToOne() {
+        val (view, listener, event) = createScrollableView(50.0, 50.0)
+
+        assertTrue(listener.onScroll(event, event, 10.0f, 10.0f))
+
+        val params = view.transformationParameters
+        assertEquals(40.0, params.horizontalTranslation, 1e-3)
+        assertEquals(40.0, params.verticalTranslation, 1e-3)
+    }
+
+    @Test
+    fun gestureScroll_whenTensionDisabled_hardClampsToMargin() {
+        val (view, listener, event) = createScrollableView(90.0, 90.0)
+        view.scrollTensionEnabled = false
+
+        assertTrue(listener.onScroll(event, event, -50.0f, -50.0f))
+
+        val params = view.transformationParameters
+        assertEquals(GestureBitmapView.DEFAULT_SCROLL_MARGIN.toDouble(), params.horizontalTranslation, 1e-3)
+        assertEquals(GestureBitmapView.DEFAULT_SCROLL_MARGIN.toDouble(), params.verticalTranslation, 1e-3)
+    }
+
+    @Test
+    fun gestureScroll_whenTensionEnabledAndZeroMargins_hardClampsToBound() {
+        val (view, listener, event) = createScrollableView(0.0, 0.0)
+        view.leftScrollMargin = 0.0f
+        view.topScrollMargin = 0.0f
+        view.rightScrollMargin = 0.0f
+        view.bottomScrollMargin = 0.0f
+
+        assertTrue(listener.onScroll(event, event, -50.0f, -50.0f))
+
+        val params = view.transformationParameters
+        assertEquals(0.0, params.horizontalTranslation, 1e-3)
+        assertEquals(0.0, params.verticalTranslation, 1e-3)
+    }
+
+    @Test
+    fun gestureScroll_whenTensionEnabledAndOverscrolling_notifiesBoundReachedListener() {
+        val (view, listener, event) = createScrollableView(0.0, 0.0)
+        val leftListener =
+            mockk<GestureBitmapView.OnLeftBoundReachedListener>(relaxUnitFun = true)
+        view.leftBoundReachedListener = leftListener
+
+        // large drag reaches the (margin expanded) left bound
+        assertTrue(listener.onScroll(event, event, -5000.0f, 0.0f))
+
+        verify(exactly = 1) { leftListener.onLeftBoundReached(view) }
+        assertTrue(
+            view.transformationParameters.horizontalTranslation <=
+                    GestureBitmapView.DEFAULT_SCROLL_MARGIN
+        )
+    }
+
+    private fun createScrollableView(
+        tx: Double,
+        ty: Double
+    ): Triple<GestureBitmapView, GestureDetector.SimpleOnGestureListener, MotionEvent> {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val view = GestureBitmapView(context)
+
+        val gestureDetector: GestureDetector? = view.getPrivateProperty("gestureDetector")
+        val gestureDetectorListener: GestureDetector.SimpleOnGestureListener? =
+            gestureDetector?.getPrivateProperty("mListener")
+        require(gestureDetectorListener != null)
+
+        view.displayType = GestureBitmapView.DisplayType.NONE
+        view.measure(
+            View.MeasureSpec.makeMeasureSpec(1080, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY)
+        )
+        view.layout(0, 0, 1080, 1920)
+
+        val event = mockk<MotionEvent>()
+        every { event.pointerCount }.returns(2)
+
+        every { bitmap.isRecycled }.returns(false)
+        every { bitmap.width }.returns(1080)
+        every { bitmap.height }.returns(1920)
+        view.bitmap = bitmap
+
+        val params = view.transformationParameters
+        params.scale = 2.0
+        params.horizontalTranslation = tx
+        params.verticalTranslation = ty
+        view.transformationParameters = params
+
+        return Triple(view, gestureDetectorListener, event)
+    }
+
+    @Test
     fun gestureScroll_whenNoBitmap_makesNoScroll() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val view = GestureBitmapView(context)
@@ -5008,12 +5265,14 @@ class GestureBitmapViewTest {
             Float::class.javaPrimitiveType,
             Float::class.javaPrimitiveType,
             Float::class.javaPrimitiveType,
-            Boolean::class.javaPrimitiveType
+            Boolean::class.javaPrimitiveType,
+            Float::class.javaPrimitiveType,
+            Float::class.javaPrimitiveType
         )
         method.isAccessible = true
 
         fun limit(current: Float, delta: Float, snap: Boolean): Float =
-            method.invoke(view, current, delta, 0.0f, 10.0f, snap) as Float
+            method.invoke(view, current, delta, 0.0f, 10.0f, snap, 0.0f, 10.0f) as Float
 
         // in range: variation is limited to allowed range
         assertEquals(2.0f, limit(5.0f, 2.0f, false), 0.0f)
@@ -5065,6 +5324,8 @@ class GestureBitmapViewTest {
         private const val TOP_SCROLL_MARGIN_KEY = "topScrollMargin"
         private const val RIGHT_SCROLL_MARGIN_KEY = "rightScrollMargin"
         private const val BOTTOM_SCROLL_MARGIN_KEY = "bottomScrollMargin"
+        private const val SCROLL_TENSION_ENABLED_KEY = "scrollTensionEnabled"
+        private const val SCROLL_TENSION_KEY = "scrollTension"
 
         private fun getTransformationParameters(): MetricTransformationParameters {
             val randomizer = UniformRandomizer()

@@ -44,6 +44,7 @@ import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.pow
 import kotlin.math.sin
 
 /**
@@ -467,6 +468,31 @@ class GestureBitmapView @JvmOverloads constructor(
         }
 
     /**
+     * Indicates whether tension is applied when the bitmap is dragged beyond its scroll limits.
+     * When true, dragging past the un-margined bound is progressively resisted up to the
+     * corresponding scroll margin (rubber-band effect). When false, the bitmap follows the finger
+     * until the hard margin is reached.
+     */
+    var scrollTensionEnabled = true
+
+    /**
+     * Amount of tension (resistance) applied when the bitmap is dragged beyond its scroll limits
+     * and [scrollTensionEnabled] is true.
+     * Each outward finger movement is multiplied by `(1 - overscroll / margin)^scrollTension`.
+     * A value of 1 (default) makes resistance grow linearly with the overscroll. Larger values
+     * make resistance grow faster (stiffer feel), values between 0 and 1 make it softer, and 0
+     * removes tension so that the bitmap follows the finger until the hard margin.
+     * @throws IllegalArgumentException if provided value is negative.
+     */
+    var scrollTension = DEFAULT_SCROLL_TENSION
+        set(value) {
+            if (value < 0.0f) {
+                throw IllegalArgumentException()
+            }
+            field = value
+        }
+
+    /**
      * Indicates whether antialiasing is enabled or not.
      */
     var isAntialiasingEnabled: Boolean
@@ -682,6 +708,8 @@ class GestureBitmapView @JvmOverloads constructor(
         bundle.putFloat(TOP_SCROLL_MARGIN_KEY, topScrollMargin)
         bundle.putFloat(RIGHT_SCROLL_MARGIN_KEY, rightScrollMargin)
         bundle.putFloat(BOTTOM_SCROLL_MARGIN_KEY, bottomScrollMargin)
+        bundle.putBoolean(SCROLL_TENSION_ENABLED_KEY, scrollTensionEnabled)
+        bundle.putFloat(SCROLL_TENSION_KEY, scrollTension)
 
         return bundle
     }
@@ -732,6 +760,8 @@ class GestureBitmapView @JvmOverloads constructor(
             topScrollMargin = state.getFloat(TOP_SCROLL_MARGIN_KEY)
             rightScrollMargin = state.getFloat(RIGHT_SCROLL_MARGIN_KEY)
             bottomScrollMargin = state.getFloat(BOTTOM_SCROLL_MARGIN_KEY)
+            scrollTensionEnabled = state.getBoolean(SCROLL_TENSION_ENABLED_KEY, true)
+            scrollTension = state.getFloat(SCROLL_TENSION_KEY, DEFAULT_SCROLL_TENSION)
         }
 
         // request redraw
@@ -917,7 +947,11 @@ class GestureBitmapView @JvmOverloads constructor(
         if (rectTop > minTop && newTop <= minTop) {
             bottomBoundReachedListener?.onBottomBoundReached(this)
         }
-        result.y = limitDelta(rectTop, dy, minTop, maxTop, snap)
+        result.y = limitDelta(
+            rectTop, dy, minTop, maxTop, snap,
+            minAllowedStart(rectHeight, viewHeight, 0.0f),
+            maxAllowedStart(rectHeight, viewHeight, 0.0f)
+        )
 
         // horizontal limits
         val minLeft = minAllowedStart(rectWidth, viewWidth, rightMargin)
@@ -929,7 +963,11 @@ class GestureBitmapView @JvmOverloads constructor(
         if (rectLeft > minLeft && newLeft <= minLeft) {
             rightBoundReachedListener?.onRightBoundReached(this)
         }
-        result.x = limitDelta(rectLeft, dx, minLeft, maxLeft, snap)
+        result.x = limitDelta(
+            rectLeft, dx, minLeft, maxLeft, snap,
+            minAllowedStart(rectWidth, viewWidth, 0.0f),
+            maxAllowedStart(rectWidth, viewWidth, 0.0f)
+        )
     }
 
     /**
@@ -978,6 +1016,8 @@ class GestureBitmapView @JvmOverloads constructor(
      * @param snap true to always end within the allowed range. If false and current value is
      * already out of range (e.g. because scale or rotation have changed), only variations
      * approaching the allowed range are accepted, and never beyond requested amount.
+     * @param softMinValue minimum value allowed without scroll margin (tension starts below it).
+     * @param softMaxValue maximum value allowed without scroll margin (tension starts above it).
      * @return allowed variation.
      */
     private fun limitDelta(
@@ -985,16 +1025,64 @@ class GestureBitmapView @JvmOverloads constructor(
         delta: Float,
         minValue: Float,
         maxValue: Float,
-        snap: Boolean
+        snap: Boolean,
+        softMinValue: Float,
+        softMaxValue: Float
     ): Float {
         val target = current + delta
         return when {
-            snap || (current in minValue..maxValue) ->
-                max(minValue, min(target, maxValue)) - current
+            snap -> max(minValue, min(target, maxValue)) - current
+
+            current in minValue..maxValue -> {
+                val allowed = tensionDelta(current, delta, softMinValue, softMaxValue, minValue, maxValue)
+                max(minValue, min(current + allowed, maxValue)) - current
+            }
 
             current > maxValue -> if (delta < 0.0f) max(target, minValue) - current else 0.0f
             else -> if (delta > 0.0f) min(target, maxValue) - current else 0.0f
         }
+    }
+
+    /**
+     * Applies tension (resistance) to a requested variation when it moves the coordinate further
+     * beyond the un-margined bounds, so that the resistance grows with the overscroll (as
+     * configured by [scrollTension]) until it reaches the margin.
+     *
+     * @param current current value of coordinate, within the margin-expanded range.
+     * @param delta requested variation.
+     * @param softMinValue minimum value without margin.
+     * @param softMaxValue maximum value without margin.
+     * @param minValue minimum value including margin.
+     * @param maxValue maximum value including margin.
+     * @return variation after applying tension, or the requested one if tension does not apply.
+     */
+    private fun tensionDelta(
+        current: Float,
+        delta: Float,
+        softMinValue: Float,
+        softMaxValue: Float,
+        minValue: Float,
+        maxValue: Float
+    ): Float {
+        if (!scrollTensionEnabled) {
+            return delta
+        }
+
+        val overscroll: Float
+        val margin: Float
+        if (delta > 0.0f) {
+            overscroll = max(0.0f, current - softMaxValue)
+            margin = maxValue - softMaxValue
+        } else {
+            overscroll = max(0.0f, softMinValue - current)
+            margin = softMinValue - minValue
+        }
+        if (overscroll <= 0.0f || margin <= 0.0f) {
+            return delta
+        }
+
+        val resistance = (1.0f - overscroll / margin).coerceIn(0.0f, 1.0f).pow(scrollTension)
+        return delta * resistance
     }
 
     /**
@@ -1866,6 +1954,12 @@ class GestureBitmapView @JvmOverloads constructor(
             bottomScrollMargin =
                 getFloat(R.styleable.GestureBitmapView_bottomScrollMargin, bottomScrollMargin)
 
+            scrollTensionEnabled = getBoolean(
+                R.styleable.GestureBitmapView_scrollTensionEnabled,
+                scrollTensionEnabled
+            )
+            scrollTension = getFloat(R.styleable.GestureBitmapView_scrollTension, scrollTension)
+
         }
     }
 
@@ -2100,6 +2194,11 @@ class GestureBitmapView @JvmOverloads constructor(
         const val DEFAULT_SCROLL_MARGIN = 100.0f
 
         /**
+         * Default amount of tension applied when overscrolling (linear resistance).
+         */
+        const val DEFAULT_SCROLL_TENSION = 1.0f
+
+        /**
          * Ratio between initial and average speed of the interpolator used to animate scroll.
          */
         private const val FLING_INITIAL_SPEED_FACTOR = 2.0f
@@ -2211,6 +2310,16 @@ class GestureBitmapView @JvmOverloads constructor(
          * Key to store bottom scroll margin.
          */
         private const val BOTTOM_SCROLL_MARGIN_KEY = "bottomScrollMargin"
+
+        /**
+         * Key to store whether scroll tension is enabled.
+         */
+        private const val SCROLL_TENSION_ENABLED_KEY = "scrollTensionEnabled"
+
+        /**
+         * Key to store amount of scroll tension.
+         */
+        private const val SCROLL_TENSION_KEY = "scrollTension"
 
         /**
          * Length of arrays to store matrix values.

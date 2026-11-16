@@ -156,6 +156,11 @@ The following properties are supported in xml layouts:
 - **bottomScrollMargin**: amount of bottom margin given when bottom boundary of bitmap is reached
   while scrolling. A positive value can be used to make a bouncing effect, so that bitmap bounces
   back to the bottom side when bottom boundary is reached.
+- **scrollTensionEnabled**: indicates whether dragging past a scroll boundary is progressively slowed
+  down (rubber-band effect) up to the scroll margin. Enabled by default.
+- **scrollTension**: amount of tension applied when overscrolling. Each outward finger movement is
+  multiplied by `(1 - overscroll / margin)^scrollTension`. Default is 1 (linear), larger values feel
+  stiffer, values between 0 and 1 feel softer and 0 removes tension. Must not be negative.
 
 See the Configuration page of the [documentation site](https://albertoirurueta.github.io/irurueta-android-gesture-bitmap-view)
 for default values and the corresponding Kotlin properties and listeners.
