@@ -137,37 +137,34 @@ class RotationGestureDetector(var listener: OnRotationGestureListener? = null) {
             MotionEvent.ACTION_DOWN -> {
                 // 1st finger touch
                 pointerId1 = event.getPointerId(0)
+                pointerId2 = INVALID_POINTER_ID
             }
             MotionEvent.ACTION_POINTER_DOWN -> {
-                // 2nd finger touch
-                pointerId2 = event.getPointerId(event.actionIndex)
-
-                // initial coordinates for 1st finger
-                val index1 = event.findPointerIndex(pointerId1)
-                initialX1 = event.getX(index1)
-                initialY1 = event.getY(index1)
-
-                // initial coordinates for 2nd finger
-                val index2 = event.findPointerIndex(pointerId2)
-                initialX2 = event.getX(index2)
-                initialY2 = event.getY(index2)
-
-                pivotX = midPoint(initialX1, initialX2)
-                pivotY = midPoint(initialY1, initialY2)
-
-                initialAngle = angleBetweenFingers(initialX1, initialY1, initialX2, initialY2)
-                currentAngle = initialAngle
+                if (pointerId1 == INVALID_POINTER_ID) {
+                    // no finger is being tracked yet
+                    pointerId1 = event.getPointerId(event.actionIndex)
+                } else if (pointerId2 == INVALID_POINTER_ID) {
+                    // 2nd finger touch
+                    pointerId2 = event.getPointerId(event.actionIndex)
+                    startTracking(event)
+                }
+                // additional fingers are ignored while two fingers are already tracked
             }
             MotionEvent.ACTION_MOVE -> {
                 // update current finger positions
                 if (pointerId1 != INVALID_POINTER_ID && pointerId2 != INVALID_POINTER_ID) {
-                    // current coordinates for 1st finger
                     val index1 = event.findPointerIndex(pointerId1)
+                    val index2 = event.findPointerIndex(pointerId2)
+                    if (index1 < 0 || index2 < 0) {
+                        // tracked fingers are not available in this event
+                        return false
+                    }
+
+                    // current coordinates for 1st finger
                     currentX1 = event.getX(index1)
                     currentY1 = event.getY(index1)
 
                     // current coordinates for 2nd finger
-                    val index2 = event.findPointerIndex(pointerId2)
                     currentX2 = event.getX(index2)
                     currentY2 = event.getY(index2)
 
@@ -186,9 +183,10 @@ class RotationGestureDetector(var listener: OnRotationGestureListener? = null) {
             }
             MotionEvent.ACTION_UP -> {
                 pointerId1 = INVALID_POINTER_ID
+                pointerId2 = INVALID_POINTER_ID
             }
             MotionEvent.ACTION_POINTER_UP -> {
-                pointerId2 = INVALID_POINTER_ID
+                onPointerUp(event)
             }
             MotionEvent.ACTION_CANCEL -> {
                 pointerId1 = INVALID_POINTER_ID
@@ -197,6 +195,74 @@ class RotationGestureDetector(var listener: OnRotationGestureListener? = null) {
         }
 
         return false
+    }
+
+    /**
+     * Handles a finger being lifted while other fingers remain on the screen.
+     * If lifted finger was being tracked, it is replaced by another finger still touching the
+     * screen (if any), and tracking restarts so that no sudden rotation is reported.
+     *
+     * @param event touch event that has occurred.
+     */
+    private fun onPointerUp(event: MotionEvent) {
+        val liftedIndex = event.actionIndex
+        val liftedId = event.getPointerId(liftedIndex)
+        if (liftedId != pointerId1 && liftedId != pointerId2) {
+            // lifted finger was not being tracked
+            return
+        }
+
+        if (liftedId == pointerId1) {
+            // 2nd finger (if any) becomes the 1st one
+            pointerId1 = pointerId2
+        }
+        pointerId2 = INVALID_POINTER_ID
+
+        // look for another finger remaining on the screen
+        for (index in 0 until event.pointerCount) {
+            if (index == liftedIndex) {
+                continue
+            }
+            val id = event.getPointerId(index)
+            if (pointerId1 == INVALID_POINTER_ID) {
+                pointerId1 = id
+            } else if (id != pointerId1) {
+                pointerId2 = id
+                break
+            }
+        }
+
+        if (pointerId1 != INVALID_POINTER_ID && pointerId2 != INVALID_POINTER_ID) {
+            startTracking(event)
+        }
+    }
+
+    /**
+     * Sets initial positions and angle for currently tracked fingers.
+     *
+     * @param event touch event that has occurred.
+     */
+    private fun startTracking(event: MotionEvent) {
+        val index1 = event.findPointerIndex(pointerId1)
+        val index2 = event.findPointerIndex(pointerId2)
+        if (index1 < 0 || index2 < 0) {
+            pointerId2 = INVALID_POINTER_ID
+            return
+        }
+
+        // initial coordinates for 1st finger
+        initialX1 = event.getX(index1)
+        initialY1 = event.getY(index1)
+
+        // initial coordinates for 2nd finger
+        initialX2 = event.getX(index2)
+        initialY2 = event.getY(index2)
+
+        pivotX = midPoint(initialX1, initialX2)
+        pivotY = midPoint(initialY1, initialY2)
+
+        initialAngle = angleBetweenFingers(initialX1, initialY1, initialX2, initialY2)
+        currentAngle = initialAngle
     }
 
     /**

@@ -54,6 +54,10 @@ android {
         compose = true
         buildConfig = true
     }
+    lint {
+        // SARIF report is uploaded to GitHub code scanning by the CI workflows
+        sarifReport = true
+    }
 }
 kotlin {
     compilerOptions {

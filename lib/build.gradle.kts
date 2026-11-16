@@ -51,6 +51,10 @@ android {
             isIncludeAndroidResources = true
         }
     }
+    lint {
+        // SARIF report is uploaded to GitHub code scanning by the CI workflows
+        sarifReport = true
+    }
     packaging {
         resources {
             excludes.add("META-INF/LICENSE-notice.md")
