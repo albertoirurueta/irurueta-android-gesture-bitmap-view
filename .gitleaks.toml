@@ -1,0 +1,12 @@
+# gitleaks configuration (used by the gitleaks job of .github/workflows/security.yml).
+title = "irurueta-android-gesture-bitmap-view gitleaks configuration"
+
+[extend]
+# keep all default gitleaks rules
+useDefault = true
+
+[allowlist]
+description = "detect-secrets baseline: contains only SHA-1 hashes of already audited findings, never secret values"
+paths = [
+    '''^\.secrets\.baseline$''',
+]
