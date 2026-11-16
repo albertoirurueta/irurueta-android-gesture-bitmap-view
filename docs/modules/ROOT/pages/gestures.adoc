@@ -48,6 +48,17 @@ The bitmap can be dragged past its edges by up to `leftScrollMargin`, `topScroll
 axis keeps it near the center. When the finger is lifted, the bitmap animates back so that it no longer exceeds its
 limits, which produces a bounce effect. Set the margins to `0` to avoid any overshoot.
 
+With `scrollTensionEnabled = true` (default) the overshoot is progressive, like a stretched rubber band. The margins
+are the maximum overshoot: while the finger drags the bitmap past a limit, each outward finger movement is multiplied
+by `(1 - overscroll / margin)^scrollTension` (the base kept between `0` and `1`), where `overscroll` is how far the
+bitmap already is past the limit. `scrollTension` (default `1`, linear) adjusts how strong the resistance is: larger
+values make it grow faster and feel stiffer, values between `0` and `1` make it softer, and `0` removes it. Movement
+therefore slows down gradually and asymptotically approaches the margin instead of stopping against a
+hard wall. Movement towards the limits, and movement within the limits, always follows the finger 1:1. With
+`scrollTensionEnabled = false`, `scrollTension = 0` or a margin of `0`, the bitmap follows the finger 1:1 and is hard clamped at the
+margin. Tension only applies while dragging: fling, `smoothScrollBy` and the bounce back animation that runs when the
+finger is lifted are not affected, and the bound reached listeners keep their behavior.
+
 Limits are computed from the area where the bitmap is currently displayed, so they follow scale and rotation changes
 made in the middle of a gesture. If a pinch or a rotation leaves the bitmap beyond its scroll limits, dragging never
 moves it more than the finger does: it can only be dragged back towards the limits, and the remaining excess is

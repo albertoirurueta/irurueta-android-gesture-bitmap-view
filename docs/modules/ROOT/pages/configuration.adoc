@@ -105,6 +105,19 @@ distance.
 |`100.0`
 |Overshoot allowed past the bottom limit, in pixels. Must not be negative.
 
+|`scrollTensionEnabled`
+|`Boolean`
+|`true`
+|Whether dragging past a scroll limit is progressively slowed down, approaching the margin asymptotically, instead of
+following the finger 1:1 until a hard stop at the margin.
+
+|`scrollTension`
+|`Float`
+|`1.0`
+|Amount of tension when `scrollTensionEnabled` is `true`: exponent of the resistance factor
+`(1 - overscroll / margin)^scrollTension`. `1` is linear, larger values feel stiffer, values between `0` and `1` feel
+softer and `0` removes tension. Must not be negative, otherwise `IllegalArgumentException`.
+
 |`isAntialiasingEnabled`
 |`Boolean`
 |`true`
@@ -183,6 +196,8 @@ Declared in `lib/src/main/res/values/attrs.xml` (styleable `GestureBitmapView`).
 |`app:topScrollMargin` |float |`topScrollMargin`
 |`app:rightScrollMargin` |float |`rightScrollMargin`
 |`app:bottomScrollMargin` |float |`bottomScrollMargin`
+|`app:scrollTensionEnabled` |boolean |`scrollTensionEnabled`
+|`app:scrollTension` |float |`scrollTension`
 |===
 
 `bitmap` (other than through `app:src`), `isAntialiasingEnabled`, `transformationParameters` and the listeners can only

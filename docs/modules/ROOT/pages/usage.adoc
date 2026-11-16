@@ -138,6 +138,8 @@ view.leftScrollMargin = 50.0f // pixels, must be >= 0
 view.topScrollMargin = 50.0f
 view.rightScrollMargin = 50.0f
 view.bottomScrollMargin = 50.0f
+view.scrollTensionEnabled = true // progressive slowdown while dragging past a limit
+view.scrollTension = 2.0f // stiffer than the default linear resistance (1.0), must be >= 0
 view.animationDurationMillis = 300L
 ----
 
@@ -270,6 +272,6 @@ Bitmaps are drawn with antialiasing by default. Disable it with `view.isAntialia
 == State saving
 
 The view saves and restores its base, gesture and display matrices, gesture flags, `displayType`, scale limits and
-margins and scroll margins across configuration changes, as long as it has an `android:id`. The bitmap itself,
+margins, scroll margins, `scrollTensionEnabled` and `scrollTension` across configuration changes, as long as it has an `android:id`. The bitmap itself,
 `animationDurationMillis`, `isAntialiasingEnabled` and the listeners are not saved: set them again when the activity
 or fragment is recreated.

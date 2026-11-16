@@ -20,7 +20,8 @@ image::video.gif[Demo of GestureBitmapView: scrolling, pinch zooming, double tap
 * Rotate with two fingers around the point between them.
 * Fling, with an animated scroll.
 * Bounce effects: configurable margins let the bitmap go past the scale and scroll limits while the gesture lasts,
-  and it animates back into place when the fingers are lifted.
+  and it animates back into place when the fingers are lifted. Dragging past a scroll limit is progressively slowed
+  down (tension), up to the margin.
 * Listeners for bounds reached, minimum and maximum scale reached, animation completion and double taps.
 * Programmatic access to the current transformation as a `Matrix` or as `MetricTransformationParameters`
   (scale, rotation angle and translation).
