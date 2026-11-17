@@ -282,6 +282,12 @@ class GestureBitmapViewTest {
                 any()
             )
         }.returns(2.5f)
+        every {
+            typedArray.getBoolean(
+                R.styleable.GestureBitmapView_rotationFlingEnabled,
+                any()
+            )
+        }.returns(false)
 
         justRun { typedArray.recycle() }
 
@@ -310,6 +316,7 @@ class GestureBitmapViewTest {
         assertEquals(200.0f, view.bottomScrollMargin, 0.0f)
         assertFalse(view.scrollTensionEnabled)
         assertEquals(2.5f, view.scrollTension, 0.0f)
+        assertFalse(view.rotationFlingEnabled)
         verify(exactly = 2) { typedArray.recycle() }
 
         assertTrue(view.isAntialiasingEnabled)
@@ -2768,6 +2775,44 @@ class GestureBitmapViewTest {
         assertTrue(bundle.containsKey(SCROLL_TENSION_ENABLED_KEY))
         assertEquals(view.scrollTensionEnabled, bundle.getBoolean(SCROLL_TENSION_ENABLED_KEY))
         assertEquals(view.scrollTension, bundle.getFloat(SCROLL_TENSION_KEY), 0.0f)
+        assertTrue(bundle.containsKey(ROTATION_FLING_ENABLED_KEY))
+        assertEquals(
+            view.rotationFlingEnabled,
+            bundle.getBoolean(ROTATION_FLING_ENABLED_KEY)
+        )
+    }
+
+    @Test
+    fun onSaveAndRestoreInstanceState_roundTripsRotationFlingEnabled() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val view1 = GestureBitmapView(context)
+        assertTrue(view1.rotationFlingEnabled)
+        view1.rotationFlingEnabled = false
+
+        val bundle: Bundle? = view1.callPrivateFuncWithResult("onSaveInstanceState")
+        require(bundle != null)
+
+        val view2 = GestureBitmapView(context)
+        assertTrue(view2.rotationFlingEnabled)
+
+        view2.callPrivateFunc("onRestoreInstanceState", bundle)
+        assertFalse(view2.rotationFlingEnabled)
+    }
+
+    @Test
+    fun onRestoreInstanceState_whenRotationFlingNotInBundle_defaultsToEnabled() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val view1 = GestureBitmapView(context)
+        val bundle: Bundle? = view1.callPrivateFuncWithResult("onSaveInstanceState")
+        require(bundle != null)
+        // simulate bundle saved by an older version
+        bundle.remove(ROTATION_FLING_ENABLED_KEY)
+
+        val view2 = GestureBitmapView(context)
+        view2.rotationFlingEnabled = false
+
+        view2.callPrivateFunc("onRestoreInstanceState", bundle)
+        assertTrue(view2.rotationFlingEnabled)
     }
 
     @Test
@@ -3152,6 +3197,63 @@ class GestureBitmapViewTest {
 
         verify(exactly = 4) { scaleAnimationCompletedListener.onScaleAnimationCompleted(view) }
         verify(exactly = 1) { minScaleReachedListener.onMinScaleReached(view) }
+    }
+
+    @LooperMode(LooperMode.Mode.PAUSED)
+    @Test
+    fun gestureDoubleTap_whenReturningToMinScale_resetsRotationAndTranslation() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val view = GestureBitmapView(context)
+        view.doubleTapEnabled = true
+
+        val rotateAndTranslateAnimationCompletedListener =
+            mockk<GestureBitmapView.OnRotateAndTranslateAnimationCompletedListener>(
+                relaxUnitFun = true
+            )
+        view.rotateAndTranslateAnimationCompletedListener =
+            rotateAndTranslateAnimationCompletedListener
+
+        view.measure(
+            View.MeasureSpec.makeMeasureSpec(640, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(480, View.MeasureSpec.EXACTLY)
+        )
+        view.layout(0, 0, 640, 480)
+
+        // view is at maximum scale, rotated and translated
+        val params = view.transformationParameters
+        params.scale = view.maxScale.toDouble()
+        params.rotationAngle = 0.5
+        params.horizontalTranslation = 30.0
+        params.verticalTranslation = -40.0
+        view.transformationParameters = params
+
+        val gestureDetector: GestureDetector? = view.getPrivateProperty("gestureDetector")
+        val gestureDetectorListener: GestureDetector.SimpleOnGestureListener? =
+            gestureDetector?.getPrivateProperty("mListener")
+        require(gestureDetectorListener != null)
+
+        val motionEvent = mockk<MotionEvent>()
+        every { motionEvent.x }.returns(0.0f)
+        every { motionEvent.y }.returns(0.0f)
+        // first double tap at maximum scale only switches direction
+        assertFalse(gestureDetectorListener.onDoubleTap(motionEvent))
+        Shadows.shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(view.maxScale.toDouble(), view.transformationParameters.scale, 1e-6)
+
+        // second double tap returns to minimum scale
+        assertFalse(gestureDetectorListener.onDoubleTap(motionEvent))
+        Shadows.shadowOf(Looper.getMainLooper()).idle()
+
+        val result = view.transformationParameters
+        assertEquals(1.0, result.scale, 0.0)
+        assertEquals(0.0, result.rotationAngle, 0.0)
+        assertEquals(0.0, result.horizontalTranslation, 0.0)
+        assertEquals(0.0, result.verticalTranslation, 0.0)
+        verify(exactly = 1) {
+            rotateAndTranslateAnimationCompletedListener.onRotateAndTranslateAnimationCompleted(
+                view
+            )
+        }
     }
 
     @LooperMode(LooperMode.Mode.PAUSED)
@@ -4552,7 +4654,7 @@ class GestureBitmapViewTest {
 
     @LooperMode(LooperMode.Mode.PAUSED)
     @Test
-    fun onTouchEvent_whenActionUpAndScaleTooSmall_resetsRotationAndTranslationInSameAnimation() {
+    fun onTouchEvent_whenActionUpAndScaleTooSmall_returnsToMinScaleKeepingRotationWithinScrollLimits() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val view = GestureBitmapView(context)
 
@@ -4606,26 +4708,41 @@ class GestureBitmapViewTest {
 
         assertTrue(view.onTouchEvent(event))
 
-        // a single animator is used
         assertNotNull(view.getPrivateProperty("scaleAnimator"))
-        assertNull(view.getPrivateProperty("translateAnimator"))
 
         //finish animation
         Shadows.shadowOf(Looper.getMainLooper()).idle()
 
+        // rotation is kept, only scale is corrected
         val transformationParameters2 = view.transformationParameters
-        assertEquals(1.0, transformationParameters2.scale, 0.0)
-        assertEquals(0.0, transformationParameters2.rotationAngle, 0.0)
-        assertEquals(0.0, transformationParameters2.horizontalTranslation, 0.0)
-        assertEquals(0.0, transformationParameters2.verticalTranslation, 0.0)
+        assertEquals(1.0, transformationParameters2.scale, 1e-6)
+        assertEquals(0.5, transformationParameters2.rotationAngle, 1e-6)
 
         verify(exactly = 1) { minScaleReachedListener.onMinScaleReached(view) }
         verify(exactly = 1) { scaleAnimationCompletedListener.onScaleAnimationCompleted(view) }
-        verify(exactly = 1) {
+        verify(exactly = 0) {
             rotateAndTranslateAnimationCompletedListener.onRotateAndTranslateAnimationCompleted(
-                view
+                any()
             )
         }
+
+        // view ends within scroll limits, so limiting again does not move it
+        val translateAnimator: ValueAnimator? = view.getPrivateProperty("translateAnimator")
+        assertTrue(translateAnimator?.isRunning != true)
+        view.callPrivateFunc("limitScaleAndTranslation")
+        Shadows.shadowOf(Looper.getMainLooper()).idle()
+        val transformationParameters3 = view.transformationParameters
+        assertEquals(
+            transformationParameters2.horizontalTranslation,
+            transformationParameters3.horizontalTranslation,
+            1e-3
+        )
+        assertEquals(
+            transformationParameters2.verticalTranslation,
+            transformationParameters3.verticalTranslation,
+            1e-3
+        )
+        assertEquals(0.5, transformationParameters3.rotationAngle, 1e-6)
     }
 
     @LooperMode(LooperMode.Mode.PAUSED)
@@ -4676,6 +4793,21 @@ class GestureBitmapViewTest {
 
         assertNull(view.getPrivateProperty("translateAnimator"))
         assertEquals(transformationParameters1, view.transformationParameters)
+    }
+
+    @Test
+    fun rotationFlingEnabled_returnsExpectedValue() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val view = GestureBitmapView(context)
+
+        // check default value
+        assertTrue(view.rotationFlingEnabled)
+
+        // set new value
+        view.rotationFlingEnabled = false
+
+        // check
+        assertFalse(view.rotationFlingEnabled)
     }
 
     @Test
@@ -5100,6 +5232,438 @@ class GestureBitmapViewTest {
         )
     }
 
+    private fun createRotationFlingView(zoomedIn: Boolean = false): GestureBitmapView {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val view = GestureBitmapView(context)
+        view.measure(
+            View.MeasureSpec.makeMeasureSpec(1080, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY)
+        )
+        view.layout(0, 0, 1080, 1920)
+
+        every { bitmap.isRecycled }.returns(false)
+        every { bitmap.width }.returns(1080)
+        every { bitmap.height }.returns(1920)
+        view.bitmap = bitmap
+
+        if (zoomedIn) {
+            val params = view.transformationParameters
+            params.scale = 2.0
+            params.horizontalTranslation = -500.0
+            params.verticalTranslation = -500.0
+            view.transformationParameters = params
+        }
+        return view
+    }
+
+    private fun fireRotationEnd(
+        view: GestureBitmapView,
+        angularVelocity: Float,
+        release: Boolean = true
+    ) {
+        val detector: RotationGestureDetector? = view.getPrivateProperty("rotationGestureDetector")
+        require(detector != null)
+        val listener = detector.listener
+        require(listener != null)
+        listener.onRotationEnd(detector, angularVelocity, 540.0f, 960.0f)
+        if (release) {
+            releaseLastFinger(view, 0L)
+        }
+    }
+
+    private fun releaseLastFinger(view: GestureBitmapView, eventTime: Long) {
+        val event = MotionEvent.obtain(0L, eventTime, MotionEvent.ACTION_UP, 540.0f, 960.0f, 0)
+        view.onTouchEvent(event)
+        event.recycle()
+    }
+
+    private fun sendTouchEvent(view: GestureBitmapView, action: Int, eventTime: Long) {
+        val event = MotionEvent.obtain(0L, eventTime, action, 540.0f, 960.0f, 0)
+        view.onTouchEvent(event)
+        event.recycle()
+    }
+
+    private fun obtainTwoFingerEvent(
+        action: Int,
+        eventTime: Long,
+        x1: Float, y1: Float,
+        x2: Float, y2: Float
+    ): MotionEvent {
+        val properties = Array(2) { MotionEvent.PointerProperties() }
+        properties[0].id = 0
+        properties[0].toolType = MotionEvent.TOOL_TYPE_FINGER
+        properties[1].id = 1
+        properties[1].toolType = MotionEvent.TOOL_TYPE_FINGER
+        val coords = Array(2) { MotionEvent.PointerCoords() }
+        coords[0].x = x1
+        coords[0].y = y1
+        coords[0].pressure = 1.0f
+        coords[0].size = 1.0f
+        coords[1].x = x2
+        coords[1].y = y2
+        coords[1].pressure = 1.0f
+        coords[1].size = 1.0f
+        return MotionEvent.obtain(
+            0L, eventTime, action, 2, properties, coords,
+            0, 0, 1.0f, 1.0f, 0, 0, 0, 0
+        )
+    }
+
+    @LooperMode(LooperMode.Mode.PAUSED)
+    @Test
+    fun gestureRotationEnd_whenOneFingerLifted_waitsForLastFingerToStartFling() {
+        val view = createRotationFlingView()
+
+        fireRotationEnd(view, 4.0f, release = false)
+
+        // finger still on screen: no fling yet, so its scroll events cannot cancel it
+        assertFalse(isRotateAnimatorRunning(view))
+        assertTrue(view.getPrivateProperty<GestureBitmapView, Boolean>("rotationFlingPending") == true)
+
+        releaseLastFinger(view, 100L)
+
+        assertTrue(isRotateAnimatorRunning(view))
+        assertFalse(view.getPrivateProperty<GestureBitmapView, Boolean>("rotationFlingPending") == true)
+        Shadows.shadowOf(Looper.getMainLooper()).idle()
+        val seconds = view.animationDurationMillis / 1000.0
+        assertEquals(4.0 * seconds / 2.0, view.transformationParameters.rotationAngle, 1e-3)
+    }
+
+    @LooperMode(LooperMode.Mode.PAUSED)
+    @Test
+    fun gestureRotationEnd_whenLastFingerLiftedTooLate_makesNoFling() {
+        val view = createRotationFlingView()
+
+        fireRotationEnd(view, 4.0f, release = false)
+        releaseLastFinger(view, 151L)
+
+        assertFalse(isRotateAnimatorRunning(view))
+        Shadows.shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(0.0, view.transformationParameters.rotationAngle, 0.0)
+    }
+
+    @LooperMode(LooperMode.Mode.PAUSED)
+    @Test
+    fun gestureRotationEnd_whenNewFingerDown_discardsPendingFling() {
+        val view = createRotationFlingView()
+
+        fireRotationEnd(view, 4.0f, release = false)
+        sendTouchEvent(view, MotionEvent.ACTION_POINTER_DOWN, 10L)
+        releaseLastFinger(view, 20L)
+
+        assertFalse(isRotateAnimatorRunning(view))
+    }
+
+    @LooperMode(LooperMode.Mode.PAUSED)
+    @Test
+    fun gestureRotationEnd_whenCancelled_discardsPendingFling() {
+        val view = createRotationFlingView()
+
+        fireRotationEnd(view, 4.0f, release = false)
+        sendTouchEvent(view, MotionEvent.ACTION_CANCEL, 10L)
+        releaseLastFinger(view, 20L)
+
+        assertFalse(isRotateAnimatorRunning(view))
+    }
+
+    @LooperMode(LooperMode.Mode.PAUSED)
+    @Test
+    fun gestureRotationEnd_whenNewActionDown_discardsPendingFling() {
+        val view = createRotationFlingView()
+
+        fireRotationEnd(view, 4.0f, release = false)
+        sendTouchEvent(view, MotionEvent.ACTION_DOWN, 10L)
+
+        assertFalse(view.getPrivateProperty<GestureBitmapView, Boolean>("rotationFlingPending") == true)
+    }
+
+    @LooperMode(LooperMode.Mode.PAUSED)
+    @Test
+    fun gestureRotationEnd_whenRotationResumes_discardsPendingFling() {
+        val view = createRotationFlingView()
+        val detector: RotationGestureDetector? = view.getPrivateProperty("rotationGestureDetector")
+        require(detector != null)
+        val listener = detector.listener
+        require(listener != null)
+
+        fireRotationEnd(view, 4.0f, release = false)
+        listener.onRotation(detector, 0.01f, 540.0f, 960.0f)
+        releaseLastFinger(view, 20L)
+
+        assertFalse(isRotateAnimatorRunning(view))
+    }
+
+    @LooperMode(LooperMode.Mode.PAUSED)
+    @Test
+    fun gestureRotationEnd_whenBelowThresholdAfterPendingFling_discardsIt() {
+        val view = createRotationFlingView()
+
+        fireRotationEnd(view, 4.0f, release = false)
+        fireRotationEnd(view, 0.1f, release = false)
+        releaseLastFinger(view, 20L)
+
+        assertFalse(isRotateAnimatorRunning(view))
+    }
+
+    @LooperMode(LooperMode.Mode.PAUSED)
+    @Test
+    fun onTouchEvent_whenRotatingAndRemainingFingerMovesBeforeRelease_flingIsNotCancelled() {
+        val view = createRotationFlingView()
+        view.exclusiveTwoFingerScrollEnabled = false
+
+        // two fingers rotating clockwise around the center of the view
+        val down = MotionEvent.obtain(0L, 0L, MotionEvent.ACTION_DOWN, 440.0f, 960.0f, 0)
+        view.onTouchEvent(down)
+        down.recycle()
+        val pointerDown = obtainTwoFingerEvent(
+            MotionEvent.ACTION_POINTER_DOWN or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT),
+            10L, 440.0f, 960.0f, 640.0f, 960.0f
+        )
+        view.onTouchEvent(pointerDown)
+        pointerDown.recycle()
+
+        var time = 10L
+        for (i in 1..6) {
+            time += 16L
+            val angle = 0.08 * i
+            val dx = (100.0 * kotlin.math.cos(angle)).toFloat()
+            val dy = (100.0 * kotlin.math.sin(angle)).toFloat()
+            val move = obtainTwoFingerEvent(
+                MotionEvent.ACTION_MOVE, time,
+                540.0f - dx, 960.0f - dy, 540.0f + dx, 960.0f + dy
+            )
+            view.onTouchEvent(move)
+            move.recycle()
+        }
+        val angleAtRelease = view.transformationParameters.rotationAngle
+        assertTrue(angleAtRelease > 0.0)
+
+        // first finger is lifted
+        time += 16L
+        val dx = (100.0 * kotlin.math.cos(0.48)).toFloat()
+        val dy = (100.0 * kotlin.math.sin(0.48)).toFloat()
+        val pointerUp = obtainTwoFingerEvent(
+            MotionEvent.ACTION_POINTER_UP, time,
+            540.0f - dx, 960.0f - dy, 540.0f + dx, 960.0f + dy
+        )
+        view.onTouchEvent(pointerUp)
+        pointerUp.recycle()
+
+        // remaining finger jitters before being lifted
+        time += 16L
+        val jitter = MotionEvent.obtain(
+            0L, time, MotionEvent.ACTION_MOVE, 540.0f + dx + 3.0f, 960.0f + dy + 3.0f, 0
+        )
+        view.onTouchEvent(jitter)
+        jitter.recycle()
+
+        time += 16L
+        val up = MotionEvent.obtain(
+            0L, time, MotionEvent.ACTION_UP, 540.0f + dx + 3.0f, 960.0f + dy + 3.0f, 0
+        )
+        view.onTouchEvent(up)
+        up.recycle()
+
+        assertTrue(isRotateAnimatorRunning(view))
+        Shadows.shadowOf(Looper.getMainLooper()).idle()
+        assertTrue(view.transformationParameters.rotationAngle > angleAtRelease + 0.1)
+    }
+
+    private fun isRotateAnimatorRunning(view: GestureBitmapView): Boolean {
+        val animator: ValueAnimator? = view.getPrivateProperty("rotateAnimator")
+        return animator?.isRunning == true
+    }
+
+    @LooperMode(LooperMode.Mode.PAUSED)
+    @Test
+    fun gestureRotationEnd_whenMinimumScale_flingKeepsRotation() {
+        val view = createRotationFlingView()
+        assertEquals(1.0, view.transformationParameters.scale, 0.0)
+        assertEquals(0.0, view.transformationParameters.rotationAngle, 0.0)
+
+        fireRotationEnd(view, 4.0f)
+        assertTrue(isRotateAnimatorRunning(view))
+
+        // finish fling animation and any scale correction animation
+        Shadows.shadowOf(Looper.getMainLooper()).idle()
+
+        val seconds = view.animationDurationMillis / 1000.0
+        val params = view.transformationParameters
+        assertEquals(4.0 * seconds / 2.0, params.rotationAngle, 1e-3)
+        assertNotEquals(0.0, params.rotationAngle, 0.0)
+        assertEquals(1.0, params.scale, 1e-6)
+    }
+
+    @LooperMode(LooperMode.Mode.PAUSED)
+    @Test
+    fun gestureRotationEnd_whenFastRotation_flingsInSameDirection() {
+        val view = createRotationFlingView()
+        assertEquals(0.0, view.transformationParameters.rotationAngle, 0.0)
+
+        fireRotationEnd(view, 4.0f)
+        assertTrue(isRotateAnimatorRunning(view))
+
+        // finish animation
+        Shadows.shadowOf(Looper.getMainLooper()).idle()
+
+        assertFalse(isRotateAnimatorRunning(view))
+        val seconds = view.animationDurationMillis / 1000.0
+        assertEquals(4.0 * seconds / 2.0, view.transformationParameters.rotationAngle, 1e-3)
+    }
+
+    @LooperMode(LooperMode.Mode.PAUSED)
+    @Test
+    fun gestureRotationEnd_whenFastNegativeRotation_flingsInSameDirection() {
+        val view = createRotationFlingView()
+
+        fireRotationEnd(view, -4.0f)
+        assertTrue(isRotateAnimatorRunning(view))
+
+        Shadows.shadowOf(Looper.getMainLooper()).idle()
+
+        val seconds = view.animationDurationMillis / 1000.0
+        assertEquals(-4.0 * seconds / 2.0, view.transformationParameters.rotationAngle, 1e-3)
+    }
+
+    @LooperMode(LooperMode.Mode.PAUSED)
+    @Test
+    fun gestureRotationEnd_whenRotationFlingDisabled_makesNoFling() {
+        val view = createRotationFlingView()
+        view.rotationFlingEnabled = false
+
+        fireRotationEnd(view, 4.0f)
+
+        assertFalse(isRotateAnimatorRunning(view))
+        Shadows.shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(0.0, view.transformationParameters.rotationAngle, 0.0)
+    }
+
+    @LooperMode(LooperMode.Mode.PAUSED)
+    @Test
+    fun gestureRotationEnd_whenRotationDisabled_makesNoFling() {
+        val view = createRotationFlingView()
+        view.rotationEnabled = false
+
+        fireRotationEnd(view, 4.0f)
+
+        assertFalse(isRotateAnimatorRunning(view))
+        Shadows.shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(0.0, view.transformationParameters.rotationAngle, 0.0)
+    }
+
+    @LooperMode(LooperMode.Mode.PAUSED)
+    @Test
+    fun gestureRotationEnd_whenVelocityBelowThreshold_makesNoFling() {
+        val view = createRotationFlingView()
+
+        fireRotationEnd(view, 0.1f)
+        fireRotationEnd(view, 0.0f)
+
+        assertFalse(isRotateAnimatorRunning(view))
+        Shadows.shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(0.0, view.transformationParameters.rotationAngle, 0.0)
+    }
+
+    @LooperMode(LooperMode.Mode.PAUSED)
+    @Test
+    fun gestureRotationEnd_whenActionDown_cancelsFling() {
+        val view = createRotationFlingView()
+
+        fireRotationEnd(view, 4.0f)
+        assertTrue(isRotateAnimatorRunning(view))
+
+        val event = MotionEvent.obtain(0L, 0L, MotionEvent.ACTION_DOWN, 100.0f, 100.0f, 0)
+        view.onTouchEvent(event)
+        event.recycle()
+
+        assertFalse(isRotateAnimatorRunning(view))
+        Shadows.shadowOf(Looper.getMainLooper()).idle()
+        val seconds = view.animationDurationMillis / 1000.0
+        assertTrue(view.transformationParameters.rotationAngle < 4.0 * seconds / 2.0 - 1e-3)
+    }
+
+    @LooperMode(LooperMode.Mode.PAUSED)
+    @Test
+    fun gestureRotationEnd_whenScroll_cancelsFling() {
+        val view = createRotationFlingView()
+        val gestureDetector: GestureDetector? = view.getPrivateProperty("gestureDetector")
+        val gestureDetectorListener: GestureDetector.SimpleOnGestureListener? =
+            gestureDetector?.getPrivateProperty("mListener")
+        require(gestureDetectorListener != null)
+        view.exclusiveTwoFingerScrollEnabled = false
+
+        fireRotationEnd(view, 4.0f)
+        assertTrue(isRotateAnimatorRunning(view))
+
+        val event = mockk<MotionEvent>()
+        every { event.pointerCount }.returns(1)
+        assertTrue(gestureDetectorListener.onScroll(event, event, 10.0f, 10.0f))
+
+        assertFalse(isRotateAnimatorRunning(view))
+    }
+
+    @LooperMode(LooperMode.Mode.PAUSED)
+    @Test
+    fun gestureRotationEnd_whenScale_cancelsFling() {
+        val view = createRotationFlingView()
+        val scaleGestureDetector: ScaleGestureDetector? =
+            view.getPrivateProperty("scaleGestureDetector")
+        val scaleGestureDetectorListener: ScaleGestureDetector.SimpleOnScaleGestureListener? =
+            scaleGestureDetector?.getPrivateProperty("mListener")
+        require(scaleGestureDetectorListener != null)
+
+        fireRotationEnd(view, 4.0f)
+        assertTrue(isRotateAnimatorRunning(view))
+
+        val scaleGestureDetectorSpy = spyk(scaleGestureDetector)
+        every { scaleGestureDetectorSpy.currentSpan }.returns(100.0f)
+        every { scaleGestureDetectorSpy.scaleFactor }.returns(2.0f)
+        assertTrue(scaleGestureDetectorListener.onScale(scaleGestureDetectorSpy))
+
+        assertFalse(isRotateAnimatorRunning(view))
+    }
+
+    @LooperMode(LooperMode.Mode.PAUSED)
+    @Test
+    fun gestureRotationEnd_whenFlingEnds_viewIsWithinScrollLimits() {
+        val view = createRotationFlingView()
+
+        val params = view.transformationParameters
+        params.scale = 2.0
+        params.horizontalTranslation = -100.0
+        params.verticalTranslation = -100.0
+        view.transformationParameters = params
+
+        fireRotationEnd(view, 4.0f)
+        Shadows.shadowOf(Looper.getMainLooper()).idle()
+
+        assertFalse(isRotateAnimatorRunning(view))
+        val animator: ValueAnimator? = view.getPrivateProperty("translateAnimator")
+        assertTrue(animator?.isRunning != true)
+
+        // limiting again does not move the view, since it is already within limits
+        val before = view.transformationParameters
+        view.callPrivateFunc("limitScaleAndTranslation")
+        Shadows.shadowOf(Looper.getMainLooper()).idle()
+        val after = view.transformationParameters
+        assertEquals(before.horizontalTranslation, after.horizontalTranslation, 1e-3)
+        assertEquals(before.verticalTranslation, after.verticalTranslation, 1e-3)
+        assertEquals(before.rotationAngle, after.rotationAngle, 1e-6)
+    }
+
+    @LooperMode(LooperMode.Mode.PAUSED)
+    @Test
+    fun gestureRotationEnd_whenActionUpAfterFling_doesNotCancelFling() {
+        val view = createRotationFlingView()
+
+        fireRotationEnd(view, 4.0f)
+        assertTrue(isRotateAnimatorRunning(view))
+
+        // end of gesture with scale within limits must keep the fling running
+        view.callPrivateFunc("limitScaleAndTranslation")
+        assertTrue(isRotateAnimatorRunning(view))
+    }
+
     @Test
     fun gestureLongPress_whenNotLongClickable_makesNoAction() {
         val context = ApplicationProvider.getApplicationContext<Context>()
@@ -5326,6 +5890,7 @@ class GestureBitmapViewTest {
         private const val BOTTOM_SCROLL_MARGIN_KEY = "bottomScrollMargin"
         private const val SCROLL_TENSION_ENABLED_KEY = "scrollTensionEnabled"
         private const val SCROLL_TENSION_KEY = "scrollTension"
+        private const val ROTATION_FLING_ENABLED_KEY = "rotationFlingEnabled"
 
         private fun getTransformationParameters(): MetricTransformationParameters {
             val randomizer = UniformRandomizer()

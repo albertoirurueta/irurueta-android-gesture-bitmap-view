@@ -31,5 +31,6 @@
         <attr name="bottomScrollMargin" format="float"/>
         <attr name="scrollTensionEnabled" format="boolean"/>
         <attr name="scrollTension" format="float"/>
+        <attr name="rotationFlingEnabled" format="boolean"/>
     </declare-styleable>
 </resources>

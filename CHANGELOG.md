@@ -9,6 +9,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Rotation fling: when a rotation gesture ends while still rotating, the bitmap keeps rotating, decelerating until it
+  stops. The fling starts when the last finger is lifted (within 150 ms of the rotation ending); configurable with
+  `rotationFlingEnabled` / `app:rotationFlingEnabled` (default `true`).
 - Tension overscroll: when dragging past a scroll limit, movement is progressively slowed down and asymptotically
   approaches the scroll margin instead of following the finger 1:1 until a hard stop. Enabled by default and
   configurable with `scrollTensionEnabled` / `app:scrollTensionEnabled`. The amount of resistance can be adjusted with
@@ -26,8 +29,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   in a single step; the excess is corrected by the release animation.
 - Fling animation starts at the velocity of the finger (it previously started at twice that velocity), hence fling
   distance is now half of what it used to be.
-- Scale animations decelerate instead of accelerating. When returning to the minimum scale, rotation and translation
-  are restored within the same animation instead of in a second one.
+- Returning to the minimum scale at the end of a gesture keeps the rotation instead of resetting it; double tap keeps
+  resetting rotation and translation.
+- Scale animations decelerate instead of accelerating. When a double tap returns to the minimum scale, rotation and
+  translation are restored within the same animation instead of in a second one.
 - No animation is started when a gesture ends with the bitmap already within its limits.
 - `RotationGestureDetector` ignores fingers beyond the second one, and restarts tracking with the remaining fingers
   when a tracked finger is lifted. `ACTION_UP` now clears both tracked fingers.

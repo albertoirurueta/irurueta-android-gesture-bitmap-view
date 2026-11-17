@@ -22,12 +22,16 @@ import io.mockk.Called
 import io.mockk.clearAllMocks
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
 import io.mockk.unmockkAll
 import io.mockk.verify
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Test
+import kotlin.math.PI
 import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
 import kotlin.random.Random
 
 class RotationGestureDetectorTest {
@@ -144,7 +148,7 @@ class RotationGestureDetectorTest {
         val listener = mockk<RotationGestureDetector.OnRotationGestureListener>()
         val detector = RotationGestureDetector(listener)
 
-        val event = mockk<MotionEvent>()
+        val event = mockk<MotionEvent>(relaxed = true)
         every { event.actionMasked }.returns(MotionEvent.ACTION_DOWN)
         every { event.getPointerId(0) }.returns(POINTER_ID_1)
 
@@ -178,14 +182,14 @@ class RotationGestureDetectorTest {
         val detector = RotationGestureDetector(listener)
 
         // send 1st event to set 1st pointer ID
-        val event1 = mockk<MotionEvent>()
+        val event1 = mockk<MotionEvent>(relaxed = true)
         every { event1.actionMasked }.returns(MotionEvent.ACTION_DOWN)
         every { event1.getPointerId(0) }.returns(POINTER_ID_1)
 
         assertFalse(detector.onTouchEvent(event1))
 
         // send 2nd event to set 2nd pointer ID
-        val event2 = mockk<MotionEvent>()
+        val event2 = mockk<MotionEvent>(relaxed = true)
         every { event2.actionMasked }.returns(MotionEvent.ACTION_POINTER_DOWN)
         every { event2.actionIndex }.returns(ACTION_INDEX)
         every { event2.getPointerId(ACTION_INDEX) }.returns(POINTER_ID_2)
@@ -229,7 +233,7 @@ class RotationGestureDetectorTest {
         val listener = mockk<RotationGestureDetector.OnRotationGestureListener>()
         val detector = RotationGestureDetector(listener)
 
-        val event = mockk<MotionEvent>()
+        val event = mockk<MotionEvent>(relaxed = true)
         every { event.actionMasked }.returns(MotionEvent.ACTION_MOVE)
 
         assertFalse(detector.onTouchEvent(event))
@@ -261,7 +265,7 @@ class RotationGestureDetectorTest {
         val listener = mockk<RotationGestureDetector.OnRotationGestureListener>()
         val detector = RotationGestureDetector(listener)
 
-        val event1 = mockk<MotionEvent>()
+        val event1 = mockk<MotionEvent>(relaxed = true)
         every { event1.actionMasked }.returns(MotionEvent.ACTION_DOWN)
         every { event1.getPointerId(0) }.returns(POINTER_ID_1)
 
@@ -273,7 +277,7 @@ class RotationGestureDetectorTest {
         var pointerId2: Int? = detector.getPrivateProperty("pointerId2")
         assertEquals(INVALID_POINTER_ID, pointerId2)
 
-        val event2 = mockk<MotionEvent>()
+        val event2 = mockk<MotionEvent>(relaxed = true)
         every { event2.actionMasked }.returns(MotionEvent.ACTION_MOVE)
 
         assertFalse(detector.onTouchEvent(event2))
@@ -308,14 +312,14 @@ class RotationGestureDetectorTest {
         val detector = RotationGestureDetector(listener)
 
         // send 1st event to set 1st pointer ID
-        val event1 = mockk<MotionEvent>()
+        val event1 = mockk<MotionEvent>(relaxed = true)
         every { event1.actionMasked }.returns(MotionEvent.ACTION_DOWN)
         every { event1.getPointerId(0) }.returns(POINTER_ID_1)
 
         assertFalse(detector.onTouchEvent(event1))
 
         // send 2nd event to set 2nd pointer ID
-        val event2 = mockk<MotionEvent>()
+        val event2 = mockk<MotionEvent>(relaxed = true)
         every { event2.actionMasked }.returns(MotionEvent.ACTION_POINTER_DOWN)
         every { event2.actionIndex }.returns(ACTION_INDEX)
         every { event2.getPointerId(ACTION_INDEX) }.returns(POINTER_ID_2)
@@ -354,7 +358,7 @@ class RotationGestureDetectorTest {
         assertEquals(0.0f, detector.deltaAngle, 0.0f)
 
         // send 3rd event to move points
-        val event3 = mockk<MotionEvent>()
+        val event3 = mockk<MotionEvent>(relaxed = true)
         every { event3.actionMasked }.returns(MotionEvent.ACTION_MOVE)
         every { event3.findPointerIndex(POINTER_ID_1) }.returns(POINTER_INDEX_1)
         val x1b = Random.Default.nextFloat()
@@ -410,14 +414,14 @@ class RotationGestureDetectorTest {
         val detector = RotationGestureDetector(listener)
 
         // send 1st event to set 1st pointer ID
-        val event1 = mockk<MotionEvent>()
+        val event1 = mockk<MotionEvent>(relaxed = true)
         every { event1.actionMasked }.returns(MotionEvent.ACTION_DOWN)
         every { event1.getPointerId(0) }.returns(POINTER_ID_1)
 
         assertFalse(detector.onTouchEvent(event1))
 
         // send 2nd event to set 2nd pointer ID
-        val event2 = mockk<MotionEvent>()
+        val event2 = mockk<MotionEvent>(relaxed = true)
         every { event2.actionMasked }.returns(MotionEvent.ACTION_POINTER_DOWN)
         every { event2.actionIndex }.returns(ACTION_INDEX)
         every { event2.getPointerId(ACTION_INDEX) }.returns(POINTER_ID_2)
@@ -441,7 +445,7 @@ class RotationGestureDetectorTest {
         assertEquals(POINTER_ID_2, pointerId2)
 
         // send 3rd event to raise 1st pointer
-        val event3 = mockk<MotionEvent>()
+        val event3 = mockk<MotionEvent>(relaxed = true)
         every { event3.actionMasked }.returns(MotionEvent.ACTION_UP)
 
         assertFalse(detector.onTouchEvent(event3))
@@ -459,14 +463,14 @@ class RotationGestureDetectorTest {
         val detector = RotationGestureDetector(listener)
 
         // send 1st event to set 1st pointer ID
-        val event1 = mockk<MotionEvent>()
+        val event1 = mockk<MotionEvent>(relaxed = true)
         every { event1.actionMasked }.returns(MotionEvent.ACTION_DOWN)
         every { event1.getPointerId(0) }.returns(POINTER_ID_1)
 
         assertFalse(detector.onTouchEvent(event1))
 
         // send 2nd event to set 2nd pointer ID
-        val event2 = mockk<MotionEvent>()
+        val event2 = mockk<MotionEvent>(relaxed = true)
         every { event2.actionMasked }.returns(MotionEvent.ACTION_POINTER_DOWN)
         every { event2.actionIndex }.returns(ACTION_INDEX)
         every { event2.getPointerId(ACTION_INDEX) }.returns(POINTER_ID_2)
@@ -490,7 +494,7 @@ class RotationGestureDetectorTest {
         assertEquals(POINTER_ID_2, pointerId2)
 
         // send 3rd event to raise 2nd pointer
-        val event3 = mockk<MotionEvent>()
+        val event3 = mockk<MotionEvent>(relaxed = true)
         every { event3.actionMasked }.returns(MotionEvent.ACTION_POINTER_UP)
         every { event3.actionIndex }.returns(POINTER_INDEX_2)
         every { event3.pointerCount }.returns(2)
@@ -512,14 +516,14 @@ class RotationGestureDetectorTest {
         val detector = RotationGestureDetector(listener)
 
         // send 1st event to set 1st pointer ID
-        val event1 = mockk<MotionEvent>()
+        val event1 = mockk<MotionEvent>(relaxed = true)
         every { event1.actionMasked }.returns(MotionEvent.ACTION_DOWN)
         every { event1.getPointerId(0) }.returns(POINTER_ID_1)
 
         assertFalse(detector.onTouchEvent(event1))
 
         // send 2nd event to set 2nd pointer ID
-        val event2 = mockk<MotionEvent>()
+        val event2 = mockk<MotionEvent>(relaxed = true)
         every { event2.actionMasked }.returns(MotionEvent.ACTION_POINTER_DOWN)
         every { event2.actionIndex }.returns(ACTION_INDEX)
         every { event2.getPointerId(ACTION_INDEX) }.returns(POINTER_ID_2)
@@ -543,7 +547,7 @@ class RotationGestureDetectorTest {
         assertEquals(POINTER_ID_2, pointerId2)
 
         // send 3rd event to cancel touch event
-        val event3 = mockk<MotionEvent>()
+        val event3 = mockk<MotionEvent>(relaxed = true)
         every { event3.actionMasked }.returns(MotionEvent.ACTION_CANCEL)
 
         assertFalse(detector.onTouchEvent(event3))
@@ -564,7 +568,7 @@ class RotationGestureDetectorTest {
         startTwoFingerGesture(detector)
 
         // 1st pointer is lifted while 2nd one remains on screen
-        val event3 = mockk<MotionEvent>()
+        val event3 = mockk<MotionEvent>(relaxed = true)
         every { event3.actionMasked }.returns(MotionEvent.ACTION_POINTER_UP)
         every { event3.actionIndex }.returns(POINTER_INDEX_1)
         every { event3.pointerCount }.returns(2)
@@ -580,13 +584,13 @@ class RotationGestureDetectorTest {
         assertEquals(INVALID_POINTER_ID, pointerId2)
 
         // moving with a single finger does not notify any rotation
-        val event4 = mockk<MotionEvent>()
+        val event4 = mockk<MotionEvent>(relaxed = true)
         every { event4.actionMasked }.returns(MotionEvent.ACTION_MOVE)
         assertFalse(detector.onTouchEvent(event4))
         verify(exactly = 0) { listener.onRotation(any(), any(), any(), any()) }
 
         // a new finger touches the screen
-        val event5 = mockk<MotionEvent>()
+        val event5 = mockk<MotionEvent>(relaxed = true)
         every { event5.actionMasked }.returns(MotionEvent.ACTION_POINTER_DOWN)
         every { event5.actionIndex }.returns(1)
         every { event5.getPointerId(1) }.returns(POINTER_ID_3)
@@ -618,7 +622,7 @@ class RotationGestureDetectorTest {
         startTwoFingerGesture(detector)
 
         // 3rd finger touches the screen and is ignored
-        val event3 = mockk<MotionEvent>()
+        val event3 = mockk<MotionEvent>(relaxed = true)
         every { event3.actionMasked }.returns(MotionEvent.ACTION_POINTER_DOWN)
         assertFalse(detector.onTouchEvent(event3))
 
@@ -628,7 +632,7 @@ class RotationGestureDetectorTest {
         assertEquals(POINTER_ID_2, pointerId2)
 
         // 2nd finger is lifted, 1st and 3rd fingers remain
-        val event4 = mockk<MotionEvent>()
+        val event4 = mockk<MotionEvent>(relaxed = true)
         every { event4.actionMasked }.returns(MotionEvent.ACTION_POINTER_UP)
         every { event4.actionIndex }.returns(1)
         every { event4.pointerCount }.returns(3)
@@ -650,7 +654,7 @@ class RotationGestureDetectorTest {
         assertEquals(POINTER_ID_3, pointerId2)
 
         // moving without changing finger positions reports no rotation change
-        val event5 = mockk<MotionEvent>()
+        val event5 = mockk<MotionEvent>(relaxed = true)
         every { event5.actionMasked }.returns(MotionEvent.ACTION_MOVE)
         every { event5.findPointerIndex(POINTER_ID_1) }.returns(0)
         every { event5.findPointerIndex(POINTER_ID_3) }.returns(1)
@@ -670,7 +674,7 @@ class RotationGestureDetectorTest {
 
         startTwoFingerGesture(detector)
 
-        val event3 = mockk<MotionEvent>()
+        val event3 = mockk<MotionEvent>(relaxed = true)
         every { event3.actionMasked }.returns(MotionEvent.ACTION_MOVE)
         every { event3.findPointerIndex(POINTER_ID_1) }.returns(-1)
         every { event3.findPointerIndex(POINTER_ID_2) }.returns(0)
@@ -685,7 +689,7 @@ class RotationGestureDetectorTest {
 
         startTwoFingerGesture(detector)
 
-        val event = mockk<MotionEvent>()
+        val event = mockk<MotionEvent>(relaxed = true)
         every { event.actionMasked }.returns(MotionEvent.ACTION_OUTSIDE)
 
         assertFalse(detector.onTouchEvent(event))
@@ -700,7 +704,7 @@ class RotationGestureDetectorTest {
     fun onTouchEvent_whenPointerDownAndNoFingerTracked_tracksFirstFinger() {
         val detector = RotationGestureDetector()
 
-        val event = mockk<MotionEvent>()
+        val event = mockk<MotionEvent>(relaxed = true)
         every { event.actionMasked }.returns(MotionEvent.ACTION_POINTER_DOWN)
         every { event.actionIndex }.returns(ACTION_INDEX)
         every { event.getPointerId(ACTION_INDEX) }.returns(POINTER_ID_2)
@@ -720,7 +724,7 @@ class RotationGestureDetectorTest {
 
         startTwoFingerGesture(detector)
 
-        val event = mockk<MotionEvent>()
+        val event = mockk<MotionEvent>(relaxed = true)
         every { event.actionMasked }.returns(MotionEvent.ACTION_MOVE)
         every { event.findPointerIndex(POINTER_ID_1) }.returns(0)
         every { event.findPointerIndex(POINTER_ID_2) }.returns(-1)
@@ -735,7 +739,7 @@ class RotationGestureDetectorTest {
 
         startTwoFingerGesture(detector)
 
-        val event = mockk<MotionEvent>()
+        val event = mockk<MotionEvent>(relaxed = true)
         every { event.actionMasked }.returns(MotionEvent.ACTION_MOVE)
         every { event.findPointerIndex(POINTER_ID_1) }.returns(0)
         every { event.findPointerIndex(POINTER_ID_2) }.returns(1)
@@ -755,7 +759,7 @@ class RotationGestureDetectorTest {
 
         startTwoFingerGesture(detector)
 
-        val event = mockk<MotionEvent>()
+        val event = mockk<MotionEvent>(relaxed = true)
         every { event.actionMasked }.returns(MotionEvent.ACTION_POINTER_UP)
         every { event.actionIndex }.returns(2)
         every { event.getPointerId(2) }.returns(POINTER_ID_3)
@@ -772,13 +776,13 @@ class RotationGestureDetectorTest {
     fun onTouchEvent_whenOnlyTrackedPointerIsLiftedAndAnotherRemains_tracksRemainingPointer() {
         val detector = RotationGestureDetector()
 
-        val event1 = mockk<MotionEvent>()
+        val event1 = mockk<MotionEvent>(relaxed = true)
         every { event1.actionMasked }.returns(MotionEvent.ACTION_DOWN)
         every { event1.getPointerId(0) }.returns(POINTER_ID_1)
         assertFalse(detector.onTouchEvent(event1))
 
         // 1st finger is lifted while an untracked finger remains
-        val event2 = mockk<MotionEvent>()
+        val event2 = mockk<MotionEvent>(relaxed = true)
         every { event2.actionMasked }.returns(MotionEvent.ACTION_POINTER_UP)
         every { event2.actionIndex }.returns(0)
         every { event2.pointerCount }.returns(2)
@@ -797,12 +801,12 @@ class RotationGestureDetectorTest {
     fun onTouchEvent_whenOnlyTrackedPointerIsLiftedAndNoneRemains_stopsTracking() {
         val detector = RotationGestureDetector()
 
-        val event1 = mockk<MotionEvent>()
+        val event1 = mockk<MotionEvent>(relaxed = true)
         every { event1.actionMasked }.returns(MotionEvent.ACTION_DOWN)
         every { event1.getPointerId(0) }.returns(POINTER_ID_1)
         assertFalse(detector.onTouchEvent(event1))
 
-        val event2 = mockk<MotionEvent>()
+        val event2 = mockk<MotionEvent>(relaxed = true)
         every { event2.actionMasked }.returns(MotionEvent.ACTION_POINTER_UP)
         every { event2.actionIndex }.returns(0)
         every { event2.pointerCount }.returns(1)
@@ -820,12 +824,12 @@ class RotationGestureDetectorTest {
     fun onTouchEvent_whenSecondFingerIsNotFoundOnPointerDown_discardsSecondFinger() {
         val detector = RotationGestureDetector()
 
-        val event1 = mockk<MotionEvent>()
+        val event1 = mockk<MotionEvent>(relaxed = true)
         every { event1.actionMasked }.returns(MotionEvent.ACTION_DOWN)
         every { event1.getPointerId(0) }.returns(POINTER_ID_1)
         assertFalse(detector.onTouchEvent(event1))
 
-        val event2 = mockk<MotionEvent>()
+        val event2 = mockk<MotionEvent>(relaxed = true)
         every { event2.actionMasked }.returns(MotionEvent.ACTION_POINTER_DOWN)
         every { event2.actionIndex }.returns(ACTION_INDEX)
         every { event2.getPointerId(ACTION_INDEX) }.returns(POINTER_ID_2)
@@ -840,14 +844,286 @@ class RotationGestureDetectorTest {
         assertEquals(INVALID_POINTER_ID, pointerId2)
     }
 
+    @Test
+    fun angularVelocity_whenClockwiseRotation_isPositive() {
+        val detector = RotationGestureDetector()
+        assertEquals(0.0f, detector.angularVelocity, 0.0f)
+
+        startGesture(detector, 0.0f, 0L)
+        rotate(detector, 0.0f, 0.1f, 5, 10L)
+
+        // 0.1 rad every 10 ms
+        assertEquals(10.0f, detector.angularVelocity, 0.01f)
+    }
+
+    @Test
+    fun angularVelocity_whenCounterClockwiseRotation_isNegative() {
+        val detector = RotationGestureDetector()
+
+        startGesture(detector, 0.0f, 0L)
+        rotate(detector, 0.0f, -0.05f, 5, 20L)
+
+        // -0.05 rad every 20 ms
+        assertEquals(-2.5f, detector.angularVelocity, 0.01f)
+    }
+
+    @Test
+    fun angularVelocity_whenAngleWrapsAroundPi_usesWrappedDelta() {
+        val detector = RotationGestureDetector()
+        val start = PI.toFloat() - 0.05f
+
+        startGesture(detector, start, 0L)
+        rotate(detector, start, 0.1f, 4, 10L)
+
+        assertEquals(10.0f, detector.angularVelocity, 0.05f)
+
+        val negativeDetector = RotationGestureDetector()
+        val negativeStart = -PI.toFloat() + 0.05f
+        startGesture(negativeDetector, negativeStart, 0L)
+        rotate(negativeDetector, negativeStart, -0.1f, 4, 10L)
+
+        assertEquals(-10.0f, negativeDetector.angularVelocity, 0.05f)
+    }
+
+    @Test
+    fun angularVelocity_whenGestureIsHeld_isZero() {
+        val detector = RotationGestureDetector()
+
+        startGesture(detector, 0.0f, 0L)
+        rotate(detector, 0.0f, 0.0f, 5, 10L)
+
+        assertEquals(0.0f, detector.angularVelocity, 0.0f)
+    }
+
+    @Test
+    fun angularVelocity_whenEventTimeDoesNotAdvance_isZero() {
+        val detector = RotationGestureDetector()
+
+        startGesture(detector, 0.0f, 0L)
+        rotate(detector, 0.0f, 0.1f, 3, 10L)
+        assertTrue(detector.angularVelocity > 0.0f)
+
+        detector.onTouchEvent(moveEvent(0.4f, 30L))
+
+        assertEquals(0.0f, detector.angularVelocity, 0.0f)
+    }
+
+    @Test
+    fun angularVelocity_whenNoisyEvent_isSmoothed() {
+        val detector = RotationGestureDetector()
+
+        startGesture(detector, 0.0f, 0L)
+        rotate(detector, 0.0f, 0.1f, 5, 10L)
+        // one sample moving twice as fast
+        detector.onTouchEvent(moveEvent(0.5f + 0.2f, 60L))
+
+        val velocity = detector.angularVelocity
+        assertTrue(velocity > 10.0f)
+        assertTrue(velocity < 20.0f)
+    }
+
+    @Test
+    fun angularVelocity_whenNewTrackingStarts_isReset() {
+        val detector = RotationGestureDetector()
+
+        startGesture(detector, 0.0f, 0L)
+        rotate(detector, 0.0f, 0.1f, 3, 10L)
+        assertTrue(detector.angularVelocity > 0.0f)
+
+        // start a new gesture
+        detector.onTouchEvent(upEvent(40L))
+        startGesture(detector, 0.0f, 100L)
+
+        assertEquals(0.0f, detector.angularVelocity, 0.0f)
+    }
+
+    @Test
+    fun onRotationEnd_whenActionPointerUp_notifiesOnceWithVelocity() {
+        val listener = mockk<RotationGestureDetector.OnRotationGestureListener>(relaxed = true)
+        every { listener.onRotation(any(), any(), any(), any()) }.returns(true)
+        val detector = RotationGestureDetector(listener)
+
+        startGesture(detector, 0.0f, 0L)
+        rotate(detector, 0.0f, 0.1f, 5, 10L)
+
+        val velocity = slot<Float>()
+        detector.onTouchEvent(pointerUpEvent(55L))
+        // later up event must not notify again
+        detector.onTouchEvent(upEvent(60L))
+
+        verify(exactly = 1) { listener.onRotationEnd(detector, capture(velocity), any(), any()) }
+        assertEquals(10.0f, velocity.captured, 0.01f)
+        assertEquals(0.0f, detector.angularVelocity, 0.0f)
+    }
+
+    @Test
+    fun onRotationEnd_whenActionUp_notifiesOnceWithVelocityAndPivot() {
+        val listener = mockk<RotationGestureDetector.OnRotationGestureListener>(relaxed = true)
+        every { listener.onRotation(any(), any(), any(), any()) }.returns(true)
+        val detector = RotationGestureDetector(listener)
+
+        startGesture(detector, 0.0f, 0L)
+        rotate(detector, 0.0f, -0.1f, 5, 10L)
+        val pivotX = detector.pivotX
+        val pivotY = detector.pivotY
+
+        detector.onTouchEvent(upEvent(55L))
+        detector.onTouchEvent(upEvent(56L))
+
+        val velocity = slot<Float>()
+        verify(exactly = 1) {
+            listener.onRotationEnd(detector, capture(velocity), pivotX, pivotY)
+        }
+        assertEquals(-10.0f, velocity.captured, 0.01f)
+    }
+
+    @Test
+    fun onRotationEnd_whenActionCancel_notifiesZeroVelocity() {
+        val listener = mockk<RotationGestureDetector.OnRotationGestureListener>(relaxed = true)
+        every { listener.onRotation(any(), any(), any(), any()) }.returns(true)
+        val detector = RotationGestureDetector(listener)
+
+        startGesture(detector, 0.0f, 0L)
+        rotate(detector, 0.0f, 0.1f, 5, 10L)
+
+        val cancel = mockk<MotionEvent>(relaxed = true)
+        every { cancel.actionMasked }.returns(MotionEvent.ACTION_CANCEL)
+        every { cancel.eventTime }.returns(55L)
+        detector.onTouchEvent(cancel)
+        detector.onTouchEvent(cancel)
+
+        verify(exactly = 1) { listener.onRotationEnd(detector, 0.0f, any(), any()) }
+    }
+
+    @Test
+    fun onRotationEnd_whenReleasedLongAfterLastMove_notifiesZeroVelocity() {
+        val listener = mockk<RotationGestureDetector.OnRotationGestureListener>(relaxed = true)
+        every { listener.onRotation(any(), any(), any(), any()) }.returns(true)
+        val detector = RotationGestureDetector(listener)
+
+        startGesture(detector, 0.0f, 0L)
+        rotate(detector, 0.0f, 0.1f, 5, 10L)
+
+        detector.onTouchEvent(upEvent(500L))
+
+        verify(exactly = 1) { listener.onRotationEnd(detector, 0.0f, any(), any()) }
+    }
+
+    @Test
+    fun onRotationEnd_whenNoRotationMovement_isNotNotified() {
+        val listener = mockk<RotationGestureDetector.OnRotationGestureListener>(relaxed = true)
+        val detector = RotationGestureDetector(listener)
+
+        startGesture(detector, 0.0f, 0L)
+        detector.onTouchEvent(pointerUpEvent(10L))
+        startGesture(detector, 0.0f, 20L)
+        detector.onTouchEvent(upEvent(30L))
+        startGesture(detector, 0.0f, 40L)
+        val cancel = mockk<MotionEvent>(relaxed = true)
+        every { cancel.actionMasked }.returns(MotionEvent.ACTION_CANCEL)
+        detector.onTouchEvent(cancel)
+
+        verify(exactly = 0) { listener.onRotationEnd(any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun onRotationEnd_whenOnlyOneFingerTracked_isNotNotified() {
+        val listener = mockk<RotationGestureDetector.OnRotationGestureListener>(relaxed = true)
+        val detector = RotationGestureDetector(listener)
+
+        val down = mockk<MotionEvent>(relaxed = true)
+        every { down.actionMasked }.returns(MotionEvent.ACTION_DOWN)
+        every { down.getPointerId(0) }.returns(POINTER_ID_1)
+        detector.onTouchEvent(down)
+        detector.onTouchEvent(upEvent(10L))
+
+        verify(exactly = 0) { listener.onRotationEnd(any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun onRotationEnd_whenListenerDoesNotOverride_doesNotFail() {
+        val listener = object : RotationGestureDetector.OnRotationGestureListener {
+            var rotations = 0
+
+            override fun onRotation(
+                gestureDetector: RotationGestureDetector,
+                angle: Float,
+                pivotX: Float,
+                pivotY: Float
+            ): Boolean {
+                rotations++
+                return true
+            }
+        }
+        val detector = RotationGestureDetector(listener)
+
+        startGesture(detector, 0.0f, 0L)
+        rotate(detector, 0.0f, 0.1f, 3, 10L)
+        detector.onTouchEvent(upEvent(40L))
+
+        assertEquals(3, listener.rotations)
+    }
+
+    private fun fingerAngleEvent(action: Int, angle: Float, time: Long): MotionEvent {
+        val event = mockk<MotionEvent>(relaxed = true)
+        every { event.actionMasked }.returns(action)
+        every { event.actionIndex }.returns(ACTION_INDEX)
+        every { event.eventTime }.returns(time)
+        every { event.pointerCount }.returns(2)
+        every { event.getPointerId(0) }.returns(POINTER_ID_1)
+        every { event.getPointerId(1) }.returns(POINTER_ID_2)
+        every { event.findPointerIndex(POINTER_ID_1) }.returns(POINTER_INDEX_1)
+        every { event.findPointerIndex(POINTER_ID_2) }.returns(POINTER_INDEX_2)
+        every { event.getX(POINTER_INDEX_1) }.returns(0.0f)
+        every { event.getY(POINTER_INDEX_1) }.returns(0.0f)
+        every { event.getX(POINTER_INDEX_2) }.returns(100.0f * cos(angle))
+        every { event.getY(POINTER_INDEX_2) }.returns(100.0f * sin(angle))
+        return event
+    }
+
+    private fun moveEvent(angle: Float, time: Long) =
+        fingerAngleEvent(MotionEvent.ACTION_MOVE, angle, time)
+
+    private fun upEvent(time: Long) = fingerAngleEvent(MotionEvent.ACTION_UP, 0.0f, time)
+
+    private fun pointerUpEvent(time: Long) =
+        fingerAngleEvent(MotionEvent.ACTION_POINTER_UP, 0.0f, time)
+
+    private fun startGesture(detector: RotationGestureDetector, angle: Float, time: Long) {
+        val down = mockk<MotionEvent>(relaxed = true)
+        every { down.actionMasked }.returns(MotionEvent.ACTION_DOWN)
+        every { down.getPointerId(0) }.returns(POINTER_ID_1)
+        detector.onTouchEvent(down)
+        detector.onTouchEvent(fingerAngleEvent(MotionEvent.ACTION_POINTER_DOWN, angle, time))
+    }
+
+    /**
+     * Sends [steps] move events, each rotating [step] radians and [interval] ms after the previous.
+     */
+    private fun rotate(
+        detector: RotationGestureDetector,
+        startAngle: Float,
+        step: Float,
+        steps: Int,
+        interval: Long
+    ) {
+        var angle = startAngle
+        var time = 0L
+        for (i in 1..steps) {
+            angle += step
+            time += interval
+            detector.onTouchEvent(moveEvent(angle, time))
+        }
+    }
+
     private fun startTwoFingerGesture(detector: RotationGestureDetector) {
-        val event1 = mockk<MotionEvent>()
+        val event1 = mockk<MotionEvent>(relaxed = true)
         every { event1.actionMasked }.returns(MotionEvent.ACTION_DOWN)
         every { event1.getPointerId(0) }.returns(POINTER_ID_1)
 
         assertFalse(detector.onTouchEvent(event1))
 
-        val event2 = mockk<MotionEvent>()
+        val event2 = mockk<MotionEvent>(relaxed = true)
         every { event2.actionMasked }.returns(MotionEvent.ACTION_POINTER_DOWN)
         every { event2.actionIndex }.returns(ACTION_INDEX)
         every { event2.getPointerId(ACTION_INDEX) }.returns(POINTER_ID_2)

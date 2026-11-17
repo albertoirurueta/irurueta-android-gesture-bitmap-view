@@ -1,0 +1,13 @@
+# OSV-Scanner configuration for the documentation toolchain (docs/package-lock.json).
+# Dependencies here are only used to build the Antora site; none of them ship with the library.
+
+[[IgnoredVulns]]
+id = "GHSA-fc5q-39xc-vjpf"
+# Re-evaluate on this date: remove the entry once Antora pulls in a patched picomatch.
+ignoreUntil = 2027-02-17
+reason = """
+picomatch ReDoS through single-branch repeated extglobs. No fixed version exists yet (affects every
+release up to 4.0.7). It is a transitive dependency of antora@3.2.2 (content-aggregator, ui-loader and
+fast-glob/micromatch) and only evaluates glob patterns defined in this repository's own Antora
+playbook when building the docs, so untrusted patterns never reach it.
+"""

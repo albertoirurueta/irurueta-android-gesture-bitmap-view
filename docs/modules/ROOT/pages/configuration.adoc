@@ -59,6 +59,12 @@ distance.
 |`true`
 |Whether two-finger rotation gestures rotate the bitmap.
 
+|`rotationFlingEnabled`
+|`Boolean`
+|`true`
+|Whether a rotation gesture that ends while still rotating makes the bitmap keep rotating, decelerating until it stops.
+Only applies when `rotationEnabled` is `true`.
+
 |`minScale`
 |`Float`
 |`1.0`
@@ -182,6 +188,7 @@ Declared in `lib/src/main/res/values/attrs.xml` (styleable `GestureBitmapView`).
 `fit_y_right`, `fit_y_center`, `center_crop` (see xref:usage.adoc#_choosing_a_display_type[display types]).
 |`app:animationDurationMillis` |integer |`animationDurationMillis`
 |`app:rotationEnabled` |boolean |`rotationEnabled`
+|`app:rotationFlingEnabled` |boolean |`rotationFlingEnabled`
 |`app:scaleEnabled` |boolean |`scaleEnabled`
 |`app:scrollEnabled` |boolean |`scrollEnabled`
 |`app:twoFingerScrollEnabled` |boolean |`twoFingerScrollEnabled`
