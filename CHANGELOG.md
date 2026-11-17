@@ -10,7 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 
 - Rotation fling: when a rotation gesture ends while still rotating, the bitmap keeps rotating, decelerating until it
-  stops; configurable with `rotationFlingEnabled` / `app:rotationFlingEnabled` (default `true`).
+  stops. The fling starts when the last finger is lifted (within 150 ms of the rotation ending); configurable with
+  `rotationFlingEnabled` / `app:rotationFlingEnabled` (default `true`).
 - Tension overscroll: when dragging past a scroll limit, movement is progressively slowed down and asymptotically
   approaches the scroll margin instead of following the finger 1:1 until a hard stop. Enabled by default and
   configurable with `scrollTensionEnabled` / `app:scrollTensionEnabled`. The amount of resistance can be adjusted with

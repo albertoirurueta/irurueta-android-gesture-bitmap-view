@@ -5256,12 +5256,217 @@ class GestureBitmapViewTest {
         return view
     }
 
-    private fun fireRotationEnd(view: GestureBitmapView, angularVelocity: Float) {
+    private fun fireRotationEnd(
+        view: GestureBitmapView,
+        angularVelocity: Float,
+        release: Boolean = true
+    ) {
         val detector: RotationGestureDetector? = view.getPrivateProperty("rotationGestureDetector")
         require(detector != null)
         val listener = detector.listener
         require(listener != null)
         listener.onRotationEnd(detector, angularVelocity, 540.0f, 960.0f)
+        if (release) {
+            releaseLastFinger(view, 0L)
+        }
+    }
+
+    private fun releaseLastFinger(view: GestureBitmapView, eventTime: Long) {
+        val event = MotionEvent.obtain(0L, eventTime, MotionEvent.ACTION_UP, 540.0f, 960.0f, 0)
+        view.onTouchEvent(event)
+        event.recycle()
+    }
+
+    private fun sendTouchEvent(view: GestureBitmapView, action: Int, eventTime: Long) {
+        val event = MotionEvent.obtain(0L, eventTime, action, 540.0f, 960.0f, 0)
+        view.onTouchEvent(event)
+        event.recycle()
+    }
+
+    private fun obtainTwoFingerEvent(
+        action: Int,
+        eventTime: Long,
+        x1: Float, y1: Float,
+        x2: Float, y2: Float
+    ): MotionEvent {
+        val properties = Array(2) { MotionEvent.PointerProperties() }
+        properties[0].id = 0
+        properties[0].toolType = MotionEvent.TOOL_TYPE_FINGER
+        properties[1].id = 1
+        properties[1].toolType = MotionEvent.TOOL_TYPE_FINGER
+        val coords = Array(2) { MotionEvent.PointerCoords() }
+        coords[0].x = x1
+        coords[0].y = y1
+        coords[0].pressure = 1.0f
+        coords[0].size = 1.0f
+        coords[1].x = x2
+        coords[1].y = y2
+        coords[1].pressure = 1.0f
+        coords[1].size = 1.0f
+        return MotionEvent.obtain(
+            0L, eventTime, action, 2, properties, coords,
+            0, 0, 1.0f, 1.0f, 0, 0, 0, 0
+        )
+    }
+
+    @LooperMode(LooperMode.Mode.PAUSED)
+    @Test
+    fun gestureRotationEnd_whenOneFingerLifted_waitsForLastFingerToStartFling() {
+        val view = createRotationFlingView()
+
+        fireRotationEnd(view, 4.0f, release = false)
+
+        // finger still on screen: no fling yet, so its scroll events cannot cancel it
+        assertFalse(isRotateAnimatorRunning(view))
+        assertTrue(view.getPrivateProperty<GestureBitmapView, Boolean>("rotationFlingPending") == true)
+
+        releaseLastFinger(view, 100L)
+
+        assertTrue(isRotateAnimatorRunning(view))
+        assertFalse(view.getPrivateProperty<GestureBitmapView, Boolean>("rotationFlingPending") == true)
+        Shadows.shadowOf(Looper.getMainLooper()).idle()
+        val seconds = view.animationDurationMillis / 1000.0
+        assertEquals(4.0 * seconds / 2.0, view.transformationParameters.rotationAngle, 1e-3)
+    }
+
+    @LooperMode(LooperMode.Mode.PAUSED)
+    @Test
+    fun gestureRotationEnd_whenLastFingerLiftedTooLate_makesNoFling() {
+        val view = createRotationFlingView()
+
+        fireRotationEnd(view, 4.0f, release = false)
+        releaseLastFinger(view, 151L)
+
+        assertFalse(isRotateAnimatorRunning(view))
+        Shadows.shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(0.0, view.transformationParameters.rotationAngle, 0.0)
+    }
+
+    @LooperMode(LooperMode.Mode.PAUSED)
+    @Test
+    fun gestureRotationEnd_whenNewFingerDown_discardsPendingFling() {
+        val view = createRotationFlingView()
+
+        fireRotationEnd(view, 4.0f, release = false)
+        sendTouchEvent(view, MotionEvent.ACTION_POINTER_DOWN, 10L)
+        releaseLastFinger(view, 20L)
+
+        assertFalse(isRotateAnimatorRunning(view))
+    }
+
+    @LooperMode(LooperMode.Mode.PAUSED)
+    @Test
+    fun gestureRotationEnd_whenCancelled_discardsPendingFling() {
+        val view = createRotationFlingView()
+
+        fireRotationEnd(view, 4.0f, release = false)
+        sendTouchEvent(view, MotionEvent.ACTION_CANCEL, 10L)
+        releaseLastFinger(view, 20L)
+
+        assertFalse(isRotateAnimatorRunning(view))
+    }
+
+    @LooperMode(LooperMode.Mode.PAUSED)
+    @Test
+    fun gestureRotationEnd_whenNewActionDown_discardsPendingFling() {
+        val view = createRotationFlingView()
+
+        fireRotationEnd(view, 4.0f, release = false)
+        sendTouchEvent(view, MotionEvent.ACTION_DOWN, 10L)
+
+        assertFalse(view.getPrivateProperty<GestureBitmapView, Boolean>("rotationFlingPending") == true)
+    }
+
+    @LooperMode(LooperMode.Mode.PAUSED)
+    @Test
+    fun gestureRotationEnd_whenRotationResumes_discardsPendingFling() {
+        val view = createRotationFlingView()
+        val detector: RotationGestureDetector? = view.getPrivateProperty("rotationGestureDetector")
+        require(detector != null)
+        val listener = detector.listener
+        require(listener != null)
+
+        fireRotationEnd(view, 4.0f, release = false)
+        listener.onRotation(detector, 0.01f, 540.0f, 960.0f)
+        releaseLastFinger(view, 20L)
+
+        assertFalse(isRotateAnimatorRunning(view))
+    }
+
+    @LooperMode(LooperMode.Mode.PAUSED)
+    @Test
+    fun gestureRotationEnd_whenBelowThresholdAfterPendingFling_discardsIt() {
+        val view = createRotationFlingView()
+
+        fireRotationEnd(view, 4.0f, release = false)
+        fireRotationEnd(view, 0.1f, release = false)
+        releaseLastFinger(view, 20L)
+
+        assertFalse(isRotateAnimatorRunning(view))
+    }
+
+    @LooperMode(LooperMode.Mode.PAUSED)
+    @Test
+    fun onTouchEvent_whenRotatingAndRemainingFingerMovesBeforeRelease_flingIsNotCancelled() {
+        val view = createRotationFlingView()
+        view.exclusiveTwoFingerScrollEnabled = false
+
+        // two fingers rotating clockwise around the center of the view
+        val down = MotionEvent.obtain(0L, 0L, MotionEvent.ACTION_DOWN, 440.0f, 960.0f, 0)
+        view.onTouchEvent(down)
+        down.recycle()
+        val pointerDown = obtainTwoFingerEvent(
+            MotionEvent.ACTION_POINTER_DOWN or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT),
+            10L, 440.0f, 960.0f, 640.0f, 960.0f
+        )
+        view.onTouchEvent(pointerDown)
+        pointerDown.recycle()
+
+        var time = 10L
+        for (i in 1..6) {
+            time += 16L
+            val angle = 0.08 * i
+            val dx = (100.0 * kotlin.math.cos(angle)).toFloat()
+            val dy = (100.0 * kotlin.math.sin(angle)).toFloat()
+            val move = obtainTwoFingerEvent(
+                MotionEvent.ACTION_MOVE, time,
+                540.0f - dx, 960.0f - dy, 540.0f + dx, 960.0f + dy
+            )
+            view.onTouchEvent(move)
+            move.recycle()
+        }
+        val angleAtRelease = view.transformationParameters.rotationAngle
+        assertTrue(angleAtRelease > 0.0)
+
+        // first finger is lifted
+        time += 16L
+        val dx = (100.0 * kotlin.math.cos(0.48)).toFloat()
+        val dy = (100.0 * kotlin.math.sin(0.48)).toFloat()
+        val pointerUp = obtainTwoFingerEvent(
+            MotionEvent.ACTION_POINTER_UP, time,
+            540.0f - dx, 960.0f - dy, 540.0f + dx, 960.0f + dy
+        )
+        view.onTouchEvent(pointerUp)
+        pointerUp.recycle()
+
+        // remaining finger jitters before being lifted
+        time += 16L
+        val jitter = MotionEvent.obtain(
+            0L, time, MotionEvent.ACTION_MOVE, 540.0f + dx + 3.0f, 960.0f + dy + 3.0f, 0
+        )
+        view.onTouchEvent(jitter)
+        jitter.recycle()
+
+        time += 16L
+        val up = MotionEvent.obtain(
+            0L, time, MotionEvent.ACTION_UP, 540.0f + dx + 3.0f, 960.0f + dy + 3.0f, 0
+        )
+        view.onTouchEvent(up)
+        up.recycle()
+
+        assertTrue(isRotateAnimatorRunning(view))
+        Shadows.shadowOf(Looper.getMainLooper()).idle()
+        assertTrue(view.transformationParameters.rotationAngle > angleAtRelease + 0.1)
     }
 
     private fun isRotateAnimatorRunning(view: GestureBitmapView): Boolean {

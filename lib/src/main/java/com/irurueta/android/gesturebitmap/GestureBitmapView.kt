@@ -140,6 +140,40 @@ class GestureBitmapView @JvmOverloads constructor(
     private var transformationChangedByGesture = false
 
     /**
+     * Touch event currently being processed, if any. Used to obtain the time when a rotation
+     * ends, only when that happens.
+     */
+    private var currentTouchEvent: MotionEvent? = null
+
+    /**
+     * Indicates whether a rotation fling is waiting for the last finger to be lifted.
+     * A rotation ends when one of its two fingers is lifted, but the finger still touching the
+     * screen keeps generating scroll events that would cancel an animation started at that point.
+     * Hence, the fling only starts once every finger has been lifted.
+     */
+    private var rotationFlingPending = false
+
+    /**
+     * Angle to animate by the pending rotation fling, expressed in radians.
+     */
+    private var pendingRotationFlingAngle = 0.0f
+
+    /**
+     * Horizontal coordinate of the pivot point of the pending rotation fling.
+     */
+    private var pendingRotationFlingPivotX = 0.0f
+
+    /**
+     * Vertical coordinate of the pivot point of the pending rotation fling.
+     */
+    private var pendingRotationFlingPivotY = 0.0f
+
+    /**
+     * Time when the rotation of the pending rotation fling ended, expressed in milliseconds.
+     */
+    private var pendingRotationFlingTime = 0L
+
+    /**
      * Paint used for drawing bitmaps with antialiasing.
      */
     private var bitmapPaint = Paint()
@@ -488,6 +522,8 @@ class GestureBitmapView @JvmOverloads constructor(
     /**
      * Indicates whether a rotation gesture keeps rotating the bitmap with decaying speed after
      * the fingers are released (rotation fling), when they were rotating fast enough.
+     * The fling starts when the last finger is lifted, provided it is lifted shortly after the
+     * rotation ends (within 150 ms), and it replaces any scroll fling made by that same release.
      * This only applies when [rotationEnabled] is true. If the scale is out of its limits when the
      * gesture ends, the scale correction animation takes precedence and no rotation fling is
      * kept.
@@ -626,13 +662,21 @@ class GestureBitmapView @JvmOverloads constructor(
 
         var action = event.action
         action = action and MotionEvent.ACTION_MASK
+        currentTouchEvent = event
         if (action == MotionEvent.ACTION_DOWN) {
             cancelAllAnimators()
             transformationChangedByGesture = false
-        } else if (action == MotionEvent.ACTION_POINTER_DOWN && isAnyMultiTouchGestureEnabled()) {
-            // a multi-touch gesture handled by this view has started, prevent scrolling parents
-            // from stealing it
-            parent?.requestDisallowInterceptTouchEvent(true)
+            rotationFlingPending = false
+        } else if (action == MotionEvent.ACTION_POINTER_DOWN) {
+            // a new finger starts a new multi-touch gesture, discarding any pending fling
+            rotationFlingPending = false
+            if (isAnyMultiTouchGestureEnabled()) {
+                // a multi-touch gesture handled by this view has started, prevent scrolling
+                // parents from stealing it
+                parent?.requestDisallowInterceptTouchEvent(true)
+            }
+        } else if (action == MotionEvent.ACTION_CANCEL) {
+            rotationFlingPending = false
         }
 
         val gestureHandled = if (twoFingerScrollEnabled || scrollEnabled || scaleEnabled) {
@@ -659,6 +703,10 @@ class GestureBitmapView @JvmOverloads constructor(
             invalidate()
         }
 
+        if (action == MotionEvent.ACTION_UP && rotationFlingPending) {
+            startPendingRotationFling(event.eventTime)
+        }
+
         if ((action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL)
             && transformationChangedByGesture
         ) {
@@ -668,6 +716,7 @@ class GestureBitmapView @JvmOverloads constructor(
             limitScaleAndTranslation()
         }
 
+        currentTouchEvent = null
         return true
     }
 
@@ -1530,6 +1579,29 @@ class GestureBitmapView @JvmOverloads constructor(
     }
 
     /**
+     * Starts the pending rotation fling (if any), provided that the last finger has been lifted
+     * soon enough after the rotation ended. Otherwise (e.g. the remaining finger was kept on the
+     * screen), the pending fling is discarded.
+     * The rotation fling replaces any scroll fling started by the same release.
+     *
+     * @param eventTime time when the last finger was lifted, expressed in milliseconds.
+     */
+    private fun startPendingRotationFling(eventTime: Long) {
+        if (!rotationFlingPending) {
+            return
+        }
+        rotationFlingPending = false
+
+        if (eventTime - pendingRotationFlingTime <= ROTATION_FLING_MAX_RELEASE_DELAY_MILLIS) {
+            smoothRotateBy(
+                pendingRotationFlingAngle,
+                pendingRotationFlingPivotX,
+                pendingRotationFlingPivotY
+            )
+        }
+    }
+
+    /**
      * Cancels rotate animator if it is running.
      */
     private fun cancelRotateAnimator() {
@@ -2097,6 +2169,9 @@ class GestureBitmapView @JvmOverloads constructor(
 
                     updateRotation(newRotation, pivotX, pivotY)
 
+                    // rotation has resumed, a previous fling no longer applies
+                    rotationFlingPending = false
+
                     return true
                 }
 
@@ -2109,9 +2184,17 @@ class GestureBitmapView @JvmOverloads constructor(
                     if (rotationEnabled && rotationFlingEnabled
                         && abs(angularVelocity) >= MIN_ROTATION_FLING_VELOCITY
                     ) {
+                        // fling starts when the last finger is lifted (see onTouchEvent), because
+                        // the finger that is still touching the screen would cancel it
                         val time = animationDurationMillis / 1000.0f
-                        val angle = angularVelocity * time / FLING_INITIAL_SPEED_FACTOR
-                        smoothRotateBy(angle, pivotX, pivotY)
+                        pendingRotationFlingAngle =
+                            angularVelocity * time / FLING_INITIAL_SPEED_FACTOR
+                        pendingRotationFlingPivotX = pivotX
+                        pendingRotationFlingPivotY = pivotY
+                        pendingRotationFlingTime = currentTouchEvent?.eventTime ?: 0L
+                        rotationFlingPending = true
+                    } else {
+                        rotationFlingPending = false
                     }
                 }
             })
@@ -2346,6 +2429,13 @@ class GestureBitmapView @JvmOverloads constructor(
          * Minimum angular velocity (in radians per second) required to start a rotation fling.
          */
         private const val MIN_ROTATION_FLING_VELOCITY = 0.5f
+
+        /**
+         * Maximum time in milliseconds between the end of a rotation (one of its fingers being
+         * lifted) and the last finger being lifted for the rotation fling to start. If the
+         * remaining finger stays longer on the screen, no rotation fling is made.
+         */
+        private const val ROTATION_FLING_MAX_RELEASE_DELAY_MILLIS = 150L
 
         /**
          * Minimum scroll correction expressed in pixels that is worth animating when a gesture

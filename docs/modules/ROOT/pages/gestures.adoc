@@ -121,7 +121,10 @@ returns to the minimum scale, or by `resetTransformationParameters()`). Disable 
 With `rotationFlingEnabled = true` (default, only applies when `rotationEnabled` is `true`), when the fingers are lifted
 while the bitmap is still rotating, the rotation does not stop suddenly. It continues at the angular velocity of the
 fingers (at least 0.5 rad/s is required) and decelerates until it stops, over `animationDurationMillis`, around the
-last pivot (the midpoint between the fingers). Any new touch cancels it. When it finishes, the usual limit correction
+last pivot (the midpoint between the fingers). The fling starts when the last finger is lifted, as long as it is lifted
+within 150 ms of the rotation ending (the first finger being lifted); otherwise no fling is made. This keeps small
+movements of the remaining finger from cancelling it, and the rotation fling replaces any scroll fling made by that
+same release. Any new touch cancels it. When it finishes, the usual limit correction
 runs; if the scale is outside its limits, it is animated back to the nearest limit keeping the rotation reached by the
 fling, and the translation is brought back within the scroll limits. Disable it with `rotationFlingEnabled = false` or
 `app:rotationFlingEnabled="false"`.

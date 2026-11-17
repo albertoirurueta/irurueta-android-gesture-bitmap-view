@@ -1451,6 +1451,49 @@ class GestureBitmapViewTest {
         assertNotEquals(0.0, view.transformationParameters.rotationAngle, ABSOLUTE_ERROR)
     }
 
+    @RequiresRealDevice
+    @Test
+    fun fastRotateGesture_keepsRotatingAfterFingersAreLifted() {
+        val view = this.view ?: return fail()
+
+        assertTrue(view.rotationEnabled)
+        assertTrue(view.rotationFlingEnabled)
+
+        val xy = IntArray(2)
+        view.getLocationOnScreen(xy)
+
+        val viewCenterX = xy[0] + view.width / 2
+        val viewCenterY = xy[1] + view.height / 2
+        val distance = view.width / 6
+
+        // check initial rotation angle
+        assertEquals(0.0, view.transformationParameters.rotationAngle, 0.0)
+
+        // fast rotation: fingers swap positions in a short time, so they are still rotating
+        // when they are lifted
+        InstrumentationTestHelper.pinch(
+            viewCenterX - distance, viewCenterY - distance,
+            viewCenterX + distance, viewCenterY + distance,
+            viewCenterX + distance, viewCenterY - distance,
+            viewCenterX - distance, viewCenterY + distance,
+            FAST_ROTATION_DURATION_MILLIS
+        )
+
+        val angleAtRelease = view.transformationParameters.rotationAngle
+        assertNotEquals(0.0, angleAtRelease, ABSOLUTE_ERROR)
+
+        // wait for the rotation fling to finish
+        Thread.sleep(view.animationDurationMillis + FLING_WAIT_MARGIN_MILLIS)
+
+        // rotation has continued in the same direction after the fingers were lifted
+        val angleAfterFling = view.transformationParameters.rotationAngle
+        assertTrue(
+            kotlin.math.abs(angleAfterFling)
+                    > kotlin.math.abs(angleAtRelease) + LARGE_ABSOLUTE_ERROR
+        )
+        assertEquals(kotlin.math.sign(angleAtRelease), kotlin.math.sign(angleAfterFling), 0.0)
+    }
+
     private fun reset() {
         topBoundReached = 0
         bottomBoundReached = 0
@@ -1486,6 +1529,10 @@ class GestureBitmapViewTest {
     private companion object {
         private const val LARGE_ABSOLUTE_ERROR = 1e-3
         private const val ABSOLUTE_ERROR = 1e-4
+
+        private const val FAST_ROTATION_DURATION_MILLIS = 100
+
+        private const val FLING_WAIT_MARGIN_MILLIS = 500L
         private const val MAX_RETRIES = 2
         private const val TIMEOUT = 20000L
         private const val POLL_RETRIES = 50
