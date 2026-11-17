@@ -13,8 +13,8 @@ testCoreKtx = "1.7.0"
 publish = "0.36.0"
 robolectric = "4.16.1"
 kotlinReflect = "2.3.0"
-iruruetaGeometry = "1.5.0"
-iruruetaTestUtils = "1.3.2"
+iruruetaGeometry = "1.6.1"
+iruruetaTestUtils = "1.3.3"
 
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }

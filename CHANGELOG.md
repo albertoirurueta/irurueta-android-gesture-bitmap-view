@@ -43,6 +43,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Builds now run on JDK 21, required by the SonarCloud scanner. The library is still compiled for JVM target 17.
 - When a zoom animation that does not end at the minimum scale finishes (double tap, return from over-zoom), the
   bitmap is animated back within its scroll limits if needed.
+- Updated dependencies: `irurueta-geometry` 1.5.0 to 1.6.1 and `irurueta-android-test-utils` 1.3.2 to 1.3.3.
 - The view asks its parent not to intercept touch events once a second finger touches the screen, when scale,
   rotation or two-finger scroll is enabled.
 
