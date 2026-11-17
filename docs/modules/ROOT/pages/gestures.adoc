@@ -84,9 +84,13 @@ back to the nearest limit. At the end of that animation:
 * `OnMinScaleReachedListener` is notified if the scale is at or below `minScale`, and
   `OnMaxScaleReachedListener` if it is at or above `maxScale`;
 * `OnScaleAnimationCompletedListener` is notified;
-* if the scale is at or below `minScale`, rotation and translation are animated back to zero within the same
-  animation, so the bitmap returns to its initial position in a single movement, and
-  `OnRotateAndTranslateAnimationCompletedListener` is also notified.
+* the current rotation is kept: only the scale is animated back to `minScale`, and afterwards the translation is
+  brought back within the scroll limits. `OnRotateAndTranslateAnimationCompletedListener` is not notified in this
+  case.
+
+When a double tap returns to the minimum scale (see <<Double tap>>), rotation and translation are animated back to zero
+within the same animation, so the bitmap returns to its initial position in a single movement, and
+`OnRotateAndTranslateAnimationCompletedListener` is also notified.
 
 `minScale` (default `1.0`) and `maxScale` (default `10.0`) are relative to the initial display defined by
 `displayType`: a scale of `1.0` means the bitmap is shown as initially fitted.
@@ -95,7 +99,8 @@ back to the nearest limit. At the end of that animation:
 
 With `doubleTapEnabled = true` (default), a double tap zooms in with an animation centered on the tapped point. Each
 double tap adds `scaleFactorJump` (default `3.0`) to the current scale, up to `maxScale`. Once `maxScale` is reached,
-the next double tap zooms back to a scale of `1.0` (kept within `[minScale, maxScale]`), and the cycle starts again.
+the next double tap zooms back to a scale of `1.0` (kept within `[minScale, maxScale]`), resetting rotation and
+translation when it reaches the minimum scale, and the cycle starts again.
 A pinch gesture restarts the cycle in the zoom-in direction.
 
 `OnDoubleTapListener` is notified on every double tap, even when `doubleTapEnabled` is `false`, so you can implement
@@ -107,9 +112,19 @@ NOTE: Taps are detected by the same `GestureDetector` as scrolling, which only r
 == Rotation
 
 With `rotationEnabled = true` (default), rotating two fingers rotates the bitmap around the midpoint between them.
-There is no rotation limit, and the rotation is kept after the fingers are lifted (it is reset only when a scale
-animation ends at the minimum scale, or by `resetTransformationParameters()`). Disable it with
+There is no rotation limit, and the rotation is kept after the fingers are lifted (it is reset only when a double tap
+returns to the minimum scale, or by `resetTransformationParameters()`). Disable it with
 `rotationEnabled = false` or `app:rotationEnabled="false"`.
+
+=== Rotation fling
+
+With `rotationFlingEnabled = true` (default, only applies when `rotationEnabled` is `true`), when the fingers are lifted
+while the bitmap is still rotating, the rotation does not stop suddenly. It continues at the angular velocity of the
+fingers (at least 0.5 rad/s is required) and decelerates until it stops, over `animationDurationMillis`, around the
+last pivot (the midpoint between the fingers). Any new touch cancels it. When it finishes, the usual limit correction
+runs; if the scale is outside its limits, it is animated back to the nearest limit keeping the rotation reached by the
+fling, and the translation is brought back within the scroll limits. Disable it with `rotationFlingEnabled = false` or
+`app:rotationFlingEnabled="false"`.
 
 === Using RotationGestureDetector on its own
 
@@ -146,6 +161,11 @@ listener for those events and `false` otherwise. The detector also exposes the f
 (`initialAngle`, `currentAngle`, `deltaAngleStart`, `deltaAngle`) and the pivot (`pivotX`, `pivotY`). The `listener`
 property can be replaced at any time.
 
+When the rotation ends (a tracked finger is lifted or the gesture is cancelled), `onRotationEnd(gestureDetector,
+angularVelocity, pivotX, pivotY)` is called once, with the smoothed angular velocity in radians per second. It reports
+`0` when the gesture was cancelled or the fingers were lifted more than 100 ms after the last move. The method has an
+empty default body, and the last velocity is also available through the `angularVelocity` property.
+
 Only two fingers are tracked. Additional fingers are ignored, and when one of the tracked fingers is lifted while
 others remain on the screen, tracking restarts with the remaining ones, so that no sudden rotation is reported.
 
@@ -161,6 +181,6 @@ with the view.
 
 == Animations
 
-Double-tap zoom, the return within limits, flings and the reset after reaching the minimum scale are animated over
+Double-tap zoom, the return within limits, flings and the double tap reset to the minimum scale are animated over
 `animationDurationMillis` (default `200` ms) with a decelerating movement. Any running animation is cancelled when a new touch starts, when the
 bitmap, `displayType` or view size changes, or when the transformation is set programmatically.

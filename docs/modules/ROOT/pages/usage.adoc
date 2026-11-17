@@ -121,6 +121,7 @@ view.exclusiveTwoFingerScrollEnabled = false
 view.scaleEnabled = true
 view.doubleTapEnabled = true
 view.rotationEnabled = false
+view.rotationFlingEnabled = true // keep rotating after a rotation gesture ends while still rotating
 ----
 
 See xref:gestures.adoc[Gestures] for how these flags interact.
@@ -189,7 +190,7 @@ Setters throw `IllegalArgumentException` for out-of-range values (as noted in th
 
 |`rotateAndTranslateAnimationCompletedListener`
 |`OnRotateAndTranslateAnimationCompletedListener.onRotateAndTranslateAnimationCompleted(view)`
-|The scale animation that also restores rotation and translation when returning to the minimum scale completes.
+|The scale animation that also restores rotation and translation when a double tap returns to the minimum scale completes. It is not notified when a gesture ends below the minimum scale, since rotation is kept in that case.
 
 |`doubleTapListener`
 |`OnDoubleTapListener.onDoubleTap(view)`

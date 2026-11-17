@@ -17,6 +17,7 @@
 package com.irurueta.android.gesturebitmap
 
 import android.view.MotionEvent
+import kotlin.math.PI
 import kotlin.math.atan2
 
 /**
@@ -99,6 +100,15 @@ class RotationGestureDetector(var listener: OnRotationGestureListener? = null) {
         private set
 
     /**
+     * Angular velocity of the rotation expressed in radians per second.
+     * Positive values indicate clockwise rotation (angles obtained through atan2 grow).
+     * The value is smoothed using an exponential moving average over the latest move events,
+     * so that a single noisy event does not determine the result.
+     */
+    var angularVelocity = 0.0f
+        private set
+
+    /**
      * X coordinate of pivot point.
      * The pivot point is located between both fingers and is a point where rotation
      * should not have any effect.
@@ -121,6 +131,16 @@ class RotationGestureDetector(var listener: OnRotationGestureListener? = null) {
      * Id for 2nd finger.
      */
     private var pointerId2 = INVALID_POINTER_ID
+
+    /**
+     * Time of the last event used to measure angular velocity.
+     */
+    private var lastEventTime = 0L
+
+    /**
+     * Indicates whether any rotation movement has been reported during current gesture.
+     */
+    private var rotationReported = false
 
     /**
      * Method to call when a touch event occurs.
@@ -178,10 +198,14 @@ class RotationGestureDetector(var listener: OnRotationGestureListener? = null) {
                     deltaAngleStart = currentAngle - initialAngle
                     deltaAngle = currentAngle - prevAngle
 
+                    updateAngularVelocity(wrap(deltaAngle), event.eventTime)
+                    rotationReported = true
+
                     return (listener?.onRotation(this, deltaAngle, pivotX, pivotY)) == true
                 }
             }
             MotionEvent.ACTION_UP -> {
+                notifyRotationEnd(event, false)
                 pointerId1 = INVALID_POINTER_ID
                 pointerId2 = INVALID_POINTER_ID
             }
@@ -189,6 +213,7 @@ class RotationGestureDetector(var listener: OnRotationGestureListener? = null) {
                 onPointerUp(event)
             }
             MotionEvent.ACTION_CANCEL -> {
+                notifyRotationEnd(event, true)
                 pointerId1 = INVALID_POINTER_ID
                 pointerId2 = INVALID_POINTER_ID
             }
@@ -211,6 +236,8 @@ class RotationGestureDetector(var listener: OnRotationGestureListener? = null) {
             // lifted finger was not being tracked
             return
         }
+
+        notifyRotationEnd(event, false)
 
         if (liftedId == pointerId1) {
             // 2nd finger (if any) becomes the 1st one
@@ -263,7 +290,65 @@ class RotationGestureDetector(var listener: OnRotationGestureListener? = null) {
 
         initialAngle = angleBetweenFingers(initialX1, initialY1, initialX2, initialY2)
         currentAngle = initialAngle
+
+        angularVelocity = 0.0f
+        lastEventTime = event.eventTime
+        rotationReported = false
     }
+
+    /**
+     * Updates smoothed angular velocity using the angle variation of latest event.
+     *
+     * @param wrappedDelta angle variation since previous event, normalized to [-PI, PI].
+     * @param eventTime time of current event expressed in milliseconds.
+     */
+    private fun updateAngularVelocity(wrappedDelta: Float, eventTime: Long) {
+        val elapsed = eventTime - lastEventTime
+        lastEventTime = eventTime
+        if (elapsed <= 0L) {
+            angularVelocity = 0.0f
+            return
+        }
+
+        val instantVelocity = wrappedDelta * MILLIS_PER_SECOND / elapsed
+        angularVelocity = if (angularVelocity == 0.0f) {
+            instantVelocity
+        } else {
+            angularVelocity + SMOOTHING_FACTOR * (instantVelocity - angularVelocity)
+        }
+    }
+
+    /**
+     * Notifies the end of a rotation gesture, if two fingers were tracked and rotation was
+     * reported, and resets velocity afterward.
+     *
+     * @param event touch event that has occurred.
+     * @param cancelled true if gesture was cancelled, in which case velocity is reported as zero.
+     */
+    private fun notifyRotationEnd(event: MotionEvent, cancelled: Boolean) {
+        val tracked = pointerId1 != INVALID_POINTER_ID && pointerId2 != INVALID_POINTER_ID
+        if (tracked && rotationReported) {
+            val stale = event.eventTime - lastEventTime > MAX_SAMPLE_AGE_MILLIS
+            val velocity = if (cancelled || stale) 0.0f else angularVelocity
+            rotationReported = false
+            angularVelocity = 0.0f
+            listener?.onRotationEnd(this, velocity, pivotX, pivotY)
+        }
+        rotationReported = false
+        angularVelocity = 0.0f
+    }
+
+    /**
+     * Normalizes an angle variation to the [-PI, PI] range.
+     *
+     * @param delta angle variation to be normalized.
+     * @return normalized angle variation.
+     */
+    private fun wrap(delta: Float): Float = when {
+        delta > PI -> delta - 2 * PI
+        delta < -PI -> delta + 2 * PI
+        else -> delta
+    }.toFloat()
 
     /**
      * Returns the angle of the line joining 2 fingers.
@@ -272,6 +357,7 @@ class RotationGestureDetector(var listener: OnRotationGestureListener? = null) {
      * @param y1 y coordinate of 1st finger.
      * @param x2 x coordinate of 2nd finger.
      * @param y2 y coordinate of 2nd finger.
+     * @return angle of the line joining both fingers expressed in radians.
      */
     private fun angleBetweenFingers(x1: Float, y1: Float, x2: Float, y2: Float): Float {
         val diffX = x2 - x1
@@ -295,6 +381,22 @@ class RotationGestureDetector(var listener: OnRotationGestureListener? = null) {
          * Id for an invalid pointer (finger).
          */
         const val INVALID_POINTER_ID = -1
+
+        /**
+         * Milliseconds in a second.
+         */
+        const val MILLIS_PER_SECOND = 1000.0f
+
+        /**
+         * Weight of the latest sample when smoothing angular velocity.
+         */
+        const val SMOOTHING_FACTOR = 0.5f
+
+        /**
+         * Maximum time in milliseconds between the last move and the end of the gesture for
+         * velocity to be considered still valid (fingers held still produce zero velocity).
+         */
+        const val MAX_SAMPLE_AGE_MILLIS = 100L
     }
 
     /**
@@ -316,5 +418,23 @@ class RotationGestureDetector(var listener: OnRotationGestureListener? = null) {
             gestureDetector: RotationGestureDetector,
             angle: Float, pivotX: Float, pivotY: Float
         ): Boolean
+
+        /**
+         * Called once when two tracked fingers stop rotating, either because one of them is
+         * lifted, the gesture finishes or the gesture is cancelled. Not called if no rotation
+         * was reported during the gesture.
+         *
+         * @param gestureDetector gesture detector that raised the event.
+         * @param angularVelocity angular velocity in radians per second at the end of the
+         * gesture (positive is clockwise). Zero if the gesture was cancelled.
+         * @param pivotX x coordinate of pivot point.
+         * @param pivotY y coordinate of pivot point.
+         */
+        fun onRotationEnd(
+            gestureDetector: RotationGestureDetector,
+            angularVelocity: Float, pivotX: Float, pivotY: Float
+        ) {
+            // optional
+        }
     }
 }

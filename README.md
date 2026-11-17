@@ -118,6 +118,9 @@ The following properties are supported in xml layouts:
   expressed in milliseconds.
 - **rotationEnabled**: indicates whether the view handles rotation gestures with two fingers. If
   false, bitmap rotations are not allowed.
+- **rotationFlingEnabled**: indicates whether a rotation gesture that ends while still rotating makes the
+  bitmap keep rotating, decelerating until it stops. Only applies when rotationEnabled is true. Enabled by
+  default.
 - **scaleEnabled**: indicates whether the view handles pinch gestures to zoom bitmap. If false,
   bitmap scaling is not allowed.
 - **scrollEnabled**: indicates whether the view handles scroll gestures to translate bitmap. If

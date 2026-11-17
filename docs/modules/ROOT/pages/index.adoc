@@ -19,6 +19,7 @@ image::video.gif[Demo of GestureBitmapView: scrolling, pinch zooming, double tap
 * Double tap to jump in scale at the tapped location.
 * Rotate with two fingers around the point between them.
 * Fling, with an animated scroll.
+* Rotation fling: a rotation that ends while still rotating keeps going, decelerating until it stops.
 * Bounce effects: configurable margins let the bitmap go past the scale and scroll limits while the gesture lasts,
   and it animates back into place when the fingers are lifted. Dragging past a scroll limit is progressively slowed
   down (tension), up to the margin.

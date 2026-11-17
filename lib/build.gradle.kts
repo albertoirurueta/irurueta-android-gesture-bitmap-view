@@ -1,3 +1,5 @@
+import org.gradle.testing.jacoco.plugins.JacocoTaskExtension
+
 import com.vanniktech.maven.publish.AndroidSingleVariantLibrary
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -49,6 +51,14 @@ android {
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
+            all { test ->
+                // Robolectric loads classes through its own sandbox classloader, which JaCoCo
+                // only instruments when classes without a location are included
+                test.extensions.configure(JacocoTaskExtension::class.java) {
+                    isIncludeNoLocationClasses = true
+                    excludes = listOf("jdk.internal.*")
+                }
+            }
         }
     }
     lint {
@@ -65,6 +75,14 @@ android {
 kotlin {
     compilerOptions {
         jvmTarget = JvmTarget.JVM_17
+    }
+}
+
+dokka {
+    dokkaSourceSets {
+        named("main") {
+            includes.from("module.md")
+        }
     }
 }
 
