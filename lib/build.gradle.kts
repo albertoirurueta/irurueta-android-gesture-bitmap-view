@@ -1,3 +1,5 @@
+import org.gradle.testing.jacoco.plugins.JacocoTaskExtension
+
 import com.vanniktech.maven.publish.AndroidSingleVariantLibrary
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -9,7 +11,7 @@ plugins {
     alias(libs.plugins.publish)
 }
 
-val libraryVersion = "1.2.7"
+val libraryVersion = "1.3.0"
 
 android {
     namespace = "com.irurueta.android.gesturebitmap"
@@ -49,7 +51,19 @@ android {
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
+            all { test ->
+                // Robolectric loads classes through its own sandbox classloader, which JaCoCo
+                // only instruments when classes without a location are included
+                test.extensions.configure(JacocoTaskExtension::class.java) {
+                    isIncludeNoLocationClasses = true
+                    excludes = listOf("jdk.internal.*")
+                }
+            }
         }
+    }
+    lint {
+        // SARIF report is uploaded to GitHub code scanning by the CI workflows
+        sarifReport = true
     }
     packaging {
         resources {
@@ -61,6 +75,14 @@ android {
 kotlin {
     compilerOptions {
         jvmTarget = JvmTarget.JVM_17
+    }
+}
+
+dokka {
+    dokkaSourceSets {
+        named("main") {
+            includes.from("module.md")
+        }
     }
 }
 
@@ -101,6 +123,7 @@ sonar {
 
 dependencies {
     implementation(libs.material)
+    implementation(libs.androidx.exifinterface)
     testImplementation(libs.junit)
     testImplementation(libs.mockk.android)
     testImplementation(libs.robolectric)

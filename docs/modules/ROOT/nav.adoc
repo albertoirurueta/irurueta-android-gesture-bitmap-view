@@ -1,6 +1,8 @@
 * xref:index.adoc[Overview]
+* xref:whats-new.adoc[What's new]
 * xref:installation.adoc[Installation]
 * xref:usage.adoc[Usage]
+* xref:editing.adoc[Updating image contents]
 * xref:gestures.adoc[Gestures]
 * xref:configuration.adoc[Configuration reference]
 * xref:sample-app.adoc[Sample app]

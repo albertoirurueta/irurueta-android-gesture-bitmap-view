@@ -27,7 +27,7 @@ rotation on the bitmap.
 | --- | --- |
 | Language | Kotlin 2.3.10 (JVM target 17) |
 | Build tool | Gradle 9.4.0 (Kotlin DSL) |
-| Latest release | `1.2.7` |
+| Latest release | `1.3.0` |
 | Platform | Android |
 | Min / compile SDK | `minSdk` 26 (Android 8.0) / `compileSdk` 36 |
 | Kotlin / AGP | Kotlin 2.3.10 / Android Gradle Plugin 9.0.1 |
@@ -60,7 +60,7 @@ Latest release:
 
 ```kotlin
 dependencies {
-    implementation("com.irurueta:irurueta-android-gesture-bitmap-view:1.2.7")
+    implementation("com.irurueta:irurueta-android-gesture-bitmap-view:1.3.0")
 }
 ```
 
@@ -93,9 +93,30 @@ view.bitmap = bitmap
 
 Note that setting a new bitmap recycles the bitmap previously held by the view.
 
+### Large images
+
+Large photos do not need to be decoded by hand. `app:src` on a raster resource (JPEG, PNG or WebP) is decoded by
+regions at the resolution required by the current zoom, applying the EXIF orientation, and the same can be done from
+code with a resource, a file or a content URI:
+
+```kotlin
+view.setImageResource(R.drawable.image)
+view.setImageFile(file)
+view.setImageUri(uri)
+```
+
+See the Usage ("Large images") and "Updating image contents" pages of the
+[documentation site](https://albertoirurueta.github.io/irurueta-android-gesture-bitmap-view) for the memory budget,
+custom image sources, load listeners, updating the contents of a displayed image and a complete draw mode.
+
 The following properties are supported in xml layouts:
 
-- **src**: drawable to be displayed
+- **src**: drawable to be displayed. A raster resource is decoded by regions (EXIF orientation applied)
+- **regionDecodingEnabled**: whether images are decoded by regions at several resolutions. Enabled by default.
+- **hardwareBitmapsEnabled**: whether decoded images are hardware bitmaps (when the view is hardware accelerated).
+  Enabled by default.
+- **cachedLevelsMemoryBudget**: bytes for the decoded resolution levels. By default, 4 times the pixels of the view,
+  4 bytes each; 0 keeps only the preview.
 - **displayType**: enum to indicate the way the bitmap is initially displayed. The following options
   are supported:
     - **none**: bitmap is displayed at original scale, without additional rotation or translation.
@@ -118,6 +139,9 @@ The following properties are supported in xml layouts:
   expressed in milliseconds.
 - **rotationEnabled**: indicates whether the view handles rotation gestures with two fingers. If
   false, bitmap rotations are not allowed.
+- **rotationFlingEnabled**: indicates whether a rotation gesture that ends while still rotating makes the
+  bitmap keep rotating, decelerating until it stops. Only applies when rotationEnabled is true. Enabled by
+  default.
 - **scaleEnabled**: indicates whether the view handles pinch gestures to zoom bitmap. If false,
   bitmap scaling is not allowed.
 - **scrollEnabled**: indicates whether the view handles scroll gestures to translate bitmap. If
@@ -156,6 +180,11 @@ The following properties are supported in xml layouts:
 - **bottomScrollMargin**: amount of bottom margin given when bottom boundary of bitmap is reached
   while scrolling. A positive value can be used to make a bouncing effect, so that bitmap bounces
   back to the bottom side when bottom boundary is reached.
+- **scrollTensionEnabled**: indicates whether dragging past a scroll boundary is progressively slowed
+  down (rubber-band effect) up to the scroll margin. Enabled by default.
+- **scrollTension**: amount of tension applied when overscrolling. Each outward finger movement is
+  multiplied by `(1 - overscroll / margin)^scrollTension`. Default is 1 (linear), larger values feel
+  stiffer, values between 0 and 1 feel softer and 0 removes tension. Must not be negative.
 
 See the Configuration page of the [documentation site](https://albertoirurueta.github.io/irurueta-android-gesture-bitmap-view)
 for default values and the corresponding Kotlin properties and listeners.

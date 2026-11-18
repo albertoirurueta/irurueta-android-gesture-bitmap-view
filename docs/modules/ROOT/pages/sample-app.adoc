@@ -29,7 +29,11 @@ on the xref:index.adoc[overview page] was recorded with it.
 </androidx.constraintlayout.widget.ConstraintLayout>
 ----
 
-The image comes from `app/src/main/res/drawable/image.jpeg` through `app:src`, so no Kotlin code is needed to set it.
+The image comes from `app/src/main/res/drawable-nodpi/image.jpeg` (4032x3024) through `app:src`, so no Kotlin code is
+needed to set it. Since it is a raster resource, it is decoded by regions automatically: a preview is shown first, and
+sharper levels and patches are decoded as you zoom in (see xref:usage.adoc#large-images[Large images]).
+`regionDecodingEnabled`, `hardwareBitmapsEnabled` and `cachedLevelsMemoryBudget` are left at their defaults. The sample
+does not include a draw mode; see xref:editing.adoc[Updating image contents] for one.
 
 == Activity
 
@@ -59,4 +63,5 @@ or open the project in Android Studio and run the `app` configuration. Try dragg
 tapping and rotating with two fingers; see xref:gestures.adoc[Gestures] for what each one does.
 
 To experiment with other settings, add attributes from the xref:configuration.adoc#xml-attributes[XML attributes]
-table to the layout, for example `app:displayType="center_crop"` or `app:rotationEnabled="false"`.
+table to the layout, for example `app:displayType="center_crop"` or `app:rotationEnabled="false"`, or the large image attributes `app:regionDecodingEnabled`,
+`app:hardwareBitmapsEnabled` and `app:cachedLevelsMemoryBudget`.

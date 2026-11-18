@@ -7,6 +7,73 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-18
+
+### Added
+
+- Multi-resolution display of large images: images set through an `ImageSource` are decoded by regions, showing a
+  preview first, cached levels within a memory budget and a full-resolution patch of the visible area, instead of
+  holding the whole bitmap in memory. New API: `ImageSource`, `ImageSources` (`fromResource`, `fromAsset`, `fromFile`,
+  `fromUri`, `fromBytes`), `RegionDecoderImageSource`, `BitmapImageSource`; and in `GestureBitmapView`: `imageSource`,
+  `setImageSource`, `setImageResource`, `setImageUri`, `setImageFile`, `regionDecodingEnabled`,
+  `hardwareBitmapsEnabled`, `cachedLevelsMemoryBudget`, `imageLoadListener` (`OnImageLoadListener`),
+  `invalidateImage(region)`, `imageOverlayDrawer` (`ImageOverlayDrawer`), `mapViewToImage` and the XML attributes
+  `regionDecodingEnabled`, `hardwareBitmapsEnabled` and `cachedLevelsMemoryBudget`. EXIF orientation is applied.
+- Rotation fling: when a rotation gesture ends while still rotating, the bitmap keeps rotating, decelerating until it
+  stops. The fling starts when the last finger is lifted (within 150 ms of the rotation ending); configurable with
+  `rotationFlingEnabled` / `app:rotationFlingEnabled` (default `true`).
+- Tension overscroll: when dragging past a scroll limit, movement is progressively slowed down and asymptotically
+  approaches the scroll margin instead of following the finger 1:1 until a hard stop. Enabled by default and
+  configurable with `scrollTensionEnabled` / `app:scrollTensionEnabled`. The amount of resistance can be adjusted with
+  `scrollTension` / `app:scrollTension` (default `1.0`, linear; larger is stiffer, `0` disables it). Margins are the maximum overshoot. Fling,
+  `smoothScrollBy` and the release bounce back are unchanged.
+
+### Changed
+
+- `app:src` on a raster resource (JPEG, PNG, WebP) is decoded by regions: the EXIF orientation is applied and the
+  image size is the size in pixels of the file, which is only visible with `DisplayType.NONE` and
+  `DisplayType.FIT_IF_BIGGER`. Set `regionDecodingEnabled` to `false` for the previous behaviour. `bitmap` returns
+  `null` while an image source is set.
+- Redraws caused by gestures and animations are requested with `invalidate()` instead of `postInvalidate()`, so that
+  they are drawn without an additional frame of delay, and `onDraw` no longer allocates. Public setters keep using
+  `postInvalidate()` and can still be called from any thread.
+- Mipmaps are enabled on the bitmap set on the view, to make drawing at reduced sizes cheaper.
+- Scroll limits are computed from the area where the bitmap is currently displayed instead of the one at the start of
+  the gesture. While dragging, a bitmap left beyond its limits by a pinch or a rotation is no longer snapped to them
+  in a single step; the excess is corrected by the release animation.
+- Fling animation starts at the velocity of the finger (it previously started at twice that velocity), hence fling
+  distance is now half of what it used to be.
+- Returning to the minimum scale at the end of a gesture keeps the rotation instead of resetting it; double tap keeps
+  resetting rotation and translation.
+- Scale animations decelerate instead of accelerating. When a double tap returns to the minimum scale, rotation and
+  translation are restored within the same animation instead of in a second one.
+- No animation is started when a gesture ends with the bitmap already within its limits.
+- `RotationGestureDetector` ignores fingers beyond the second one, and restarts tracking with the remaining fingers
+  when a tracked finger is lifted. `ACTION_UP` now clears both tracked fingers.
+- Sample app image moved to `drawable-nodpi` so that it is not scaled up by screen density.
+- `setDrawable` and the `src` attribute no longer scale bitmap drawables up by screen density: the actual bitmap size
+  is used. With `DisplayType.NONE` or `FIT_IF_BIGGER`, such images are now displayed at their pixel size instead of
+  their density-scaled size.
+- Builds now run on JDK 21, required by the SonarCloud scanner. The library is still compiled for JVM target 17.
+- When a zoom animation that does not end at the minimum scale finishes (double tap, return from over-zoom), the
+  bitmap is animated back within its scroll limits if needed.
+- Updated dependencies: `irurueta-geometry` 1.5.0 to 1.6.1 and `irurueta-android-test-utils` 1.3.2 to 1.3.3.
+- The view asks its parent not to intercept touch events once a second finger touches the screen, when scale,
+  rotation or two-finger scroll is enabled.
+
+### Fixed
+
+- Very slow frames (around 100 ms on a Pixel 7a) when a large image was loaded from a density-scaled `drawable`
+  folder, caused by the bitmap being scaled up by screen density.
+- Bitmap not returning within its scroll limits when released after the first drag.
+- Wrong coordinate used to decide whether the bitmap fits horizontally when limiting scroll.
+- Scale and translation limits not being restored when a gesture is cancelled.
+- Possible `IllegalArgumentException` and rotation jumps in `RotationGestureDetector` when the first finger is lifted
+  before the second one or when more than two fingers are used.
+- A plain tap no longer moves back within scroll limits a transformation that was set programmatically.
+- Scroll and fling no longer change the transformation while no bitmap is set.
+- Unnoticeable (sub-pixel) corrections no longer start an animation when a gesture ends.
+
 ## [1.2.7] - 2026-03-07
 
 ### Changed
@@ -105,7 +172,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   `InvalidMatrixException` for non-metric matrices.
 - `RotationGestureDetector` for two-finger rotation gestures.
 
-[Unreleased]: https://github.com/albertoirurueta/irurueta-android-gesture-bitmap-view/compare/1.2.7...HEAD
+[Unreleased]: https://github.com/albertoirurueta/irurueta-android-gesture-bitmap-view/compare/1.3.0...HEAD
+[1.3.0]: https://github.com/albertoirurueta/irurueta-android-gesture-bitmap-view/compare/1.2.7...1.3.0
 [1.2.7]: https://github.com/albertoirurueta/irurueta-android-gesture-bitmap-view/compare/1.2.6...1.2.7
 [1.2.6]: https://github.com/albertoirurueta/irurueta-android-gesture-bitmap-view/compare/1.2.5...1.2.6
 [1.2.5]: https://github.com/albertoirurueta/irurueta-android-gesture-bitmap-view/compare/1.2.4...1.2.5

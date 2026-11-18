@@ -29,5 +29,11 @@
         <attr name="topScrollMargin" format="float"/>
         <attr name="rightScrollMargin" format="float"/>
         <attr name="bottomScrollMargin" format="float"/>
+        <attr name="scrollTensionEnabled" format="boolean"/>
+        <attr name="scrollTension" format="float"/>
+        <attr name="rotationFlingEnabled" format="boolean"/>
+        <attr name="regionDecodingEnabled" format="boolean"/>
+        <attr name="hardwareBitmapsEnabled" format="boolean"/>
+        <attr name="cachedLevelsMemoryBudget" format="integer"/>
     </declare-styleable>
 </resources>

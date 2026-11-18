@@ -1,6 +1,24 @@
+/*
+ * Copyright (C) 2025 Alberto Irurueta Carro (alberto@irurueta.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.irurueta.android.gesturebitmap.test
 
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Color
 import android.graphics.Matrix
 import android.os.Bundle
 import androidx.test.core.app.launchActivity
@@ -178,7 +196,9 @@ class GestureBitmapViewTest {
         assertTrue(view.scrollEnabled)
         assertTrue(view.twoFingerScrollEnabled)
         assertTrue(view.doubleTapEnabled)
-        assertNotNull(view.bitmap)
+        // app:src is a raster drawable, so it is decoded by regions through an image source
+        assertNull(view.bitmap)
+        assertNotNull(view.imageSource)
         assertEquals(GestureBitmapView.DisplayType.FIT_X_CENTER, view.displayType)
         assertEquals(GestureBitmapView.DEFAULT_MIN_SCALE, view.minScale, 0.0f)
         assertEquals(GestureBitmapView.DEFAULT_MAX_SCALE, view.maxScale, 0.0f)
@@ -1042,10 +1062,10 @@ class GestureBitmapViewTest {
 
         // after state has been recovered, parameters are restored.
         // Bitmaps are not restored, since they will be recycled and it would make
-        // bundles to exceed their maximum size, however in this test, the bitmap
+        // bundles to exceed their maximum size, however in this test, the image
         // reappears because it is provided during construction as part of the layout
         // xml parameters
-        assertNotNull(view.bitmap)
+        assertNotNull(view.imageSource)
         val transformationParameters = view.transformationParameters
         assertEquals(transformationParameters.scale, 1.1, ABSOLUTE_ERROR)
         assertEquals(transformationParameters.rotationAngle, Math.PI / 10.0, ABSOLUTE_ERROR)
@@ -1265,6 +1285,62 @@ class GestureBitmapViewTest {
         assertTrue(scrollAnimationCompleted > 0)
     }
 
+    @RequiresRealDevice
+    @Test
+    fun dragIntoOverscrollMargin_whenRepeated_returnsToLimitsEveryTime() {
+        val view = this.view ?: return fail()
+
+        view.scrollAnimationCompletedListener = scrollAnimationCompletedListener
+
+        // zoom in so that the bitmap is bigger than the view
+        UiThreadStatement.runOnUiThread {
+            val params = view.transformationParameters
+            params.scale = 3.0
+            view.transformationParameters = params
+        }
+
+        val xy = IntArray(2)
+        view.getLocationOnScreen(xy)
+
+        val viewLeft = xy[0]
+        val viewTop = xy[1]
+        val viewWidth = view.width
+        val viewHeight = view.height
+        val viewCenterY = viewTop + viewHeight / 2
+
+        // drag far enough from the left side to the right side to enter the overscroll margin
+        val fromX = viewLeft + viewWidth / 10
+        val toX = viewLeft + viewWidth - viewWidth / 10
+
+        (1..2).forEach { i ->
+            reset()
+            assertEquals(0, scrollAnimationCompleted)
+
+            // push the bitmap to the left limit several times to ensure the margin is reached
+            (0 until 4).forEach { _ ->
+                InstrumentationTestHelper.drag(fromX, viewCenterY, toX, viewCenterY)
+            }
+
+            // releasing the finger must always animate the bitmap back to its limits.
+            // Animation completions of previous drags can not be used to know when the last
+            // release has finished, hence displayed rectangle is polled instead
+            assertTrue("iteration $i", scrollAnimationCompleted > 0)
+            var retries = 0
+            while (!isWithinHorizontalLimits(view, viewWidth) && retries < POLL_RETRIES) {
+                Thread.sleep(POLL_INTERVAL_MILLIS)
+                retries++
+            }
+
+            val rect = view.displayRect ?: return fail()
+            assertTrue("iteration $i: left ${rect.left}", rect.left <= 1.0f)
+            assertTrue(
+                "iteration $i: right ${rect.right}",
+                rect.right >= viewWidth - 1.0f
+            )
+        }
+    }
+
+    @RequiresRealDevice
     @Test
     fun pinchGesture_modifiesScale() {
         val view = this.view ?: return fail()
@@ -1379,6 +1455,171 @@ class GestureBitmapViewTest {
         assertNotEquals(0.0, view.transformationParameters.rotationAngle, ABSOLUTE_ERROR)
     }
 
+    @RequiresRealDevice
+    @Test
+    fun fastRotateGesture_keepsRotatingAfterFingersAreLifted() {
+        val view = this.view ?: return fail()
+
+        assertTrue(view.rotationEnabled)
+        assertTrue(view.rotationFlingEnabled)
+
+        val xy = IntArray(2)
+        view.getLocationOnScreen(xy)
+
+        val viewCenterX = xy[0] + view.width / 2
+        val viewCenterY = xy[1] + view.height / 2
+        val distance = view.width / 6
+
+        // check initial rotation angle
+        assertEquals(0.0, view.transformationParameters.rotationAngle, 0.0)
+
+        // fast rotation: fingers swap positions in a short time, so they are still rotating
+        // when they are lifted
+        InstrumentationTestHelper.pinch(
+            viewCenterX - distance, viewCenterY - distance,
+            viewCenterX + distance, viewCenterY + distance,
+            viewCenterX + distance, viewCenterY - distance,
+            viewCenterX - distance, viewCenterY + distance,
+            FAST_ROTATION_DURATION_MILLIS
+        )
+
+        val angleAtRelease = view.transformationParameters.rotationAngle
+        assertNotEquals(0.0, angleAtRelease, ABSOLUTE_ERROR)
+
+        // wait for the rotation fling to finish
+        Thread.sleep(view.animationDurationMillis + FLING_WAIT_MARGIN_MILLIS)
+
+        // rotation has continued in the same direction after the fingers were lifted
+        val angleAfterFling = view.transformationParameters.rotationAngle
+        assertTrue(
+            kotlin.math.abs(angleAfterFling)
+                    > kotlin.math.abs(angleAtRelease) + LARGE_ABSOLUTE_ERROR
+        )
+        assertEquals(kotlin.math.sign(angleAtRelease), kotlin.math.sign(angleAfterFling), 0.0)
+    }
+
+    @Test
+    fun setImageSource_whenZoomedIn_loadsPreviewAndDetailWithoutChangingDisplayMatrix() {
+        val recorder = ImageLoadRecorder()
+        val view = prepareSmallView()
+        setSource(view, recorder, ImageSources.fromAsset(assets(), QUADRANTS_ASSET), 0L)
+        assertTrue(recorder.awaitPreviews(1))
+
+        val detailsBefore = recorder.detailCount
+        var matrixAfterZoom: Matrix? = null
+        activityScenarioRule.scenario.onActivity {
+            GestureBitmapViewTestHelper.zoomAtCenter(view, HIGH_SCALE)
+            matrixAfterZoom = view.displayTransformationMatrix
+        }
+        assertTrue(recorder.awaitDetails(detailsBefore + 1))
+        assertEquals(0, recorder.failureCount)
+
+        assertEquals(matrixAfterZoom, view.displayTransformationMatrix)
+        assertEquals(HIGH_SCALE, view.transformationParameters.scale, ABSOLUTE_ERROR)
+    }
+
+    @Test
+    fun draw_withHardwareBitmapsOnSoftwareCanvas_doesNotThrow() {
+        val recorder = ImageLoadRecorder()
+        val view = prepareSmallView()
+        view.hardwareBitmapsEnabled = true
+        setSource(view, recorder, ImageSources.fromAsset(assets(), QUADRANTS_ASSET), 0L)
+        assertTrue(recorder.awaitPreviews(1))
+
+        // level bitmaps are hardware bitmaps, which cannot be drawn on a software canvas
+        // unless the view draws a software copy of them
+        val low = drawOnSoftwareCanvas(view)
+        assertNotEquals(Color.TRANSPARENT, low.getPixel(view.width / 2, view.height / 2))
+
+        val detailsBefore = recorder.detailCount
+        activityScenarioRule.scenario.onActivity {
+            GestureBitmapViewTestHelper.zoomAtCenter(view, HIGH_SCALE)
+        }
+        assertTrue(recorder.awaitDetails(detailsBefore + 1))
+        val high = drawOnSoftwareCanvas(view)
+        assertNotEquals(Color.TRANSPARENT, high.getPixel(view.width / 2, view.height / 2))
+    }
+
+    @Test
+    fun invalidateImage_afterEditingBitmapImageSource_changesDrawnPixels() {
+        val recorder = ImageLoadRecorder()
+        val view = prepareSmallView()
+        val bitmap = Bitmap.createBitmap(400, 300, Bitmap.Config.ARGB_8888)
+        bitmap.eraseColor(Color.RED)
+        setSource(view, recorder, BitmapImageSource(bitmap), null)
+        assertTrue(recorder.awaitPreviews(1))
+        assertTrue(waitForCenterColor(view, Color.RED))
+
+        // low scale
+        editBitmap(bitmap, Color.BLUE)
+        activityScenarioRule.scenario.onActivity { view.invalidateImage() }
+        assertTrue(waitForCenterColor(view, Color.BLUE))
+
+        // high scale
+        activityScenarioRule.scenario.onActivity {
+            GestureBitmapViewTestHelper.zoomAtCenter(view, HIGH_SCALE)
+        }
+        assertTrue(waitForCenterColor(view, Color.BLUE))
+        editBitmap(bitmap, Color.GREEN)
+        activityScenarioRule.scenario.onActivity { view.invalidateImage() }
+        assertTrue(waitForCenterColor(view, Color.GREEN))
+    }
+
+    private fun assets() = InstrumentationRegistry.getInstrumentation().context.assets
+
+    private fun prepareSmallView(): GestureBitmapView {
+        val view = this.view ?: throw IllegalStateException("view not available")
+        activityScenarioRule.scenario.onActivity {
+            GestureBitmapViewTestHelper.resize(view)
+        }
+        assertTrue(
+            GestureBitmapViewTestHelper.awaitSize(view, GestureBitmapViewTestHelper.SMALL_VIEW_SIZE)
+        )
+        return view
+    }
+
+    private fun setSource(
+        view: GestureBitmapView,
+        recorder: ImageLoadRecorder,
+        source: ImageSource,
+        budget: Long?
+    ) {
+        activityScenarioRule.scenario.onActivity {
+            if (budget != null) {
+                // keeps the preview only, so that zooming in requires a detail patch
+                view.cachedLevelsMemoryBudget = budget
+            }
+            view.imageLoadListener = recorder
+            view.setImageSource(source)
+        }
+    }
+
+    private fun editBitmap(bitmap: Bitmap, color: Int) {
+        synchronized(bitmap) {
+            bitmap.eraseColor(color)
+        }
+    }
+
+    private fun drawOnSoftwareCanvas(view: GestureBitmapView): Bitmap {
+        var bitmap: Bitmap? = null
+        activityScenarioRule.scenario.onActivity {
+            // a bitmap backed canvas is not hardware accelerated
+            bitmap = GestureBitmapViewTestHelper.draw(view)
+        }
+        return bitmap ?: throw IllegalStateException("view could not be drawn")
+    }
+
+    private fun waitForCenterColor(view: GestureBitmapView, color: Int): Boolean {
+        repeat(POLL_RETRIES) {
+            val bitmap = drawOnSoftwareCanvas(view)
+            if (bitmap.getPixel(view.width / 2, view.height / 2) == color) {
+                return true
+            }
+            Thread.sleep(POLL_INTERVAL_MILLIS)
+        }
+        return false
+    }
+
     private fun reset() {
         topBoundReached = 0
         bottomBoundReached = 0
@@ -1390,6 +1631,11 @@ class GestureBitmapViewTest {
         scaleAnimationCompleted = 0
         scrollAnimationCompleted = 0
         doubleTap = 0
+    }
+
+    private fun isWithinHorizontalLimits(view: GestureBitmapView, viewWidth: Int): Boolean {
+        val rect = view.displayRect ?: return false
+        return rect.left <= 1.0f && rect.right >= viewWidth - 1.0f
     }
 
     private fun waitOnCondition(
@@ -1409,7 +1655,15 @@ class GestureBitmapViewTest {
     private companion object {
         private const val LARGE_ABSOLUTE_ERROR = 1e-3
         private const val ABSOLUTE_ERROR = 1e-4
+
+        private const val FAST_ROTATION_DURATION_MILLIS = 100
+
+        private const val FLING_WAIT_MARGIN_MILLIS = 500L
         private const val MAX_RETRIES = 2
         private const val TIMEOUT = 20000L
+        private const val POLL_RETRIES = 50
+        private const val POLL_INTERVAL_MILLIS = 100L
+        private const val QUADRANTS_ASSET = "quadrants.jpg"
+        private const val HIGH_SCALE = 10.0
     }
 }
