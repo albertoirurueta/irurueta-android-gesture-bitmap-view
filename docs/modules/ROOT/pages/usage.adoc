@@ -73,12 +73,158 @@ view.setDrawable(drawable)
 WARNING: Setting a new bitmap calls `recycle()` on the bitmap previously held by the view. Do not set a bitmap you
 still need elsewhere, and do not reuse a bitmap after it has been replaced. A recycled bitmap is ignored when set.
 
-TIP: The view draws the whole bitmap on every frame, so very large bitmaps make gestures less fluid. Decode bitmaps at
-a size close to what will actually be displayed (view size multiplied by `maxScale` at most). Oversized bitmaps
-can be dramatically slower: on a Pixel 7a, a 4032x3024 photo scaled up by density to about 10584x7938 took around
-100 ms per frame (every frame reported a slow bitmap upload), against 7 ms at its own size. `setDrawable` and `app:src`
-avoid that scaling for bitmap drawables, but a bitmap you decode and assign yourself is used as it is. The view
-enables mipmaps on the bitmap it is given (`Bitmap.setHasMipMap(true)`) to make drawing at reduced sizes cheaper.
+TIP: A bitmap you decode and assign yourself is drawn whole on every frame, so very large bitmaps make gestures less
+fluid (on a Pixel 7a, a 4032x3024 photo scaled up by density to about 10584x7938 took around 100 ms per frame, against
+7 ms at its own size). For large photos do not decode them yourself: use the multi-resolution path described in
+<<large-images>>. The view enables mipmaps on the bitmap it is given (`Bitmap.setHasMipMap(true)`) to make drawing at
+reduced sizes cheaper.
+
+[#large-images]
+== Large images
+
+A photo of several megapixels does not need to be held whole in memory to be shown on a screen. When the image is
+set through an `ImageSource` (or `setImageResource`, `setImageUri`, `setImageFile`, or `app:src` on a raster
+resource), the view decodes it by regions and keeps only what the current zoom needs:
+
+* *Preview*: a low resolution version of the whole image, decoded first, so that something is visible quickly and the
+  image can always be drawn while sharper data is loading.
+* *Cached levels*: sharper versions of the whole image, kept while they fit in `cachedLevelsMemoryBudget`.
+* *Patch*: when zoomed in beyond the cached levels, only the visible region is decoded at full resolution and drawn
+  over the coarser data. Panning or zooming decodes a new patch in background; meanwhile the coarser data keeps being
+  drawn (a new patch appears without a fade-in).
+
+Decoding runs on a worker thread, and the decoded bitmaps are released when the view is detached from the window and
+decoded again when it is attached. When the system reports memory pressure (`onTrimMemory` or `onLowMemory`), the
+patch and the cached levels sharper than the preview are dropped and decoded again when needed. The decoded bitmaps are hardware bitmaps when the view is hardware accelerated and
+`hardwareBitmapsEnabled` is `true`. Use `imageLoadListener` to be told when the preview and the sharper data are ready.
+
+=== In a layout
+
+[source,xml]
+----
+<com.irurueta.android.gesturebitmap.GestureBitmapView
+    android:id="@+id/gesture_bitmap"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    app:src="@drawable/image"
+    app:regionDecodingEnabled="true"
+    app:hardwareBitmapsEnabled="true"
+    app:cachedLevelsMemoryBudget="33554432"/>
+----
+
+`app:src` on a raster resource (JPEG, PNG or WebP; not XML drawables or nine-patches) uses region decoding
+automatically, so existing layouts benefit without code changes. The three attributes are optional and their
+defaults are shown above (the budget default is computed from the view size, see below). Two things differ from the
+previous behaviour of `app:src`:
+
+* The EXIF orientation of the image is applied, so a photo taken in portrait is displayed upright.
+* The image size is the size in pixels of the file, instead of the size of a drawable scaled by density. This is only
+  visible with `DisplayType.NONE` and `DisplayType.FIT_IF_BIGGER`, where the original size matters.
+
+Set `regionDecodingEnabled` to `false` to get the previous behaviour.
+
+=== From code
+
+Set a resource, a content URI or a file. The view takes care of opening and closing the streams.
+
+[source,kotlin]
+----
+include::example$setImageResource.kt[]
+----
+
+[source,kotlin]
+----
+include::example$setImageUri.kt[]
+----
+
+[source,kotlin]
+----
+include::example$setImageFile.kt[]
+----
+
+All of them accept `resetMatrices` (default `true`), as `setBitmap` does, and throw `IOException` if the image cannot
+be read or its format is not supported.
+
+=== Image sources
+
+`ImageSource` is the interface that provides the pixels: it exposes `storedWidth`, `storedHeight` and the EXIF
+`orientation`, and `decodeRegion(region, sampleSize, config, reuse)`. `ImageSources` has factories for the common
+cases: `fromResource`, `fromAsset`, `fromFile`, `fromUri` and `fromBytes`.
+
+[source,kotlin]
+----
+include::example$setImageSource.kt[]
+----
+
+NOTE: A source passed to `setImageSource` (or the `imageSource` property) is owned by the view: it is closed when it
+is replaced by another image or source, so do not close it nor use it afterwards. Setting the source that is already
+set does nothing.
+
+You can implement `ImageSource` to display an image that comes from anywhere (a network cache, a tiled file, a
+generator). `decodeRegion` is called on a worker thread and never concurrently with itself:
+
+[source,kotlin]
+----
+include::example$customImageSource.kt[]
+----
+
+=== EXIF orientation
+
+The orientation reported by the source is applied by the view: the image is displayed upright, `displayType`
+computes the base transformation from the upright size, and every coordinate exposed by the view (`mapViewToImage`,
+`invalidateImage` regions, the canvas of the overlay drawer) is expressed in upright image pixels. Factories read the
+orientation from the file's EXIF data (JPEG, and other formats that carry it). A custom source reports it in
+`orientation` with an `ExifInterface.ORIENTATION_*` value.
+
+=== Memory budget
+
+[source,kotlin]
+----
+include::example$cachedLevelsMemoryBudget.kt[]
+----
+
+`cachedLevelsMemoryBudget` is expressed in bytes. By default (`DEFAULT_CACHED_LEVELS_MEMORY_BUDGET`) it is
+4 times the number of pixels of the view, at 4 bytes per pixel. A budget of `0` keeps only the preview. Negative
+values throw `IllegalArgumentException`.
+
+=== Switching decoding off
+
+[source,kotlin]
+----
+include::example$regionDecodingDisabled.kt[]
+----
+
+With `regionDecodingEnabled = false` an image set through an `ImageSource` is decoded whole at its full resolution
+and drawn as a regular bitmap. Use it for small images or to compare. Changing the flag reconfigures the current image.
+
+[source,kotlin]
+----
+include::example$hardwareBitmapsDisabled.kt[]
+----
+
+Hardware bitmaps use less memory and are faster to draw, but their pixels cannot be read from the CPU.
+
+=== Setting a bitmap yourself
+
+[source,kotlin]
+----
+include::example$bitmapPath.kt[]
+----
+
+The `bitmap` property, `setBitmap` and `setDrawable` keep their behaviour (the bitmap is held whole and recycled when
+replaced). While an `ImageSource` is set, the `bitmap` getter returns `null` and `imageSource` returns the source.
+
+=== Knowing when the image is loaded
+
+[source,kotlin]
+----
+include::example$imageLoadListener.kt[]
+----
+
+`onPreviewLoaded` is called when the preview is decoded, `onDetailLoaded` each time a sharper level or a patch is
+decoded, and `onImageLoadFailed` when decoding fails.
+
+To change the contents of an image that is already displayed, see xref:editing.adoc[Updating image contents].
 
 == Choosing a display type
 
@@ -273,6 +419,7 @@ Bitmaps are drawn with antialiasing by default. Disable it with `view.isAntialia
 == State saving
 
 The view saves and restores its base, gesture and display matrices, gesture flags, `displayType`, scale limits and
-margins, scroll margins, `scrollTensionEnabled` and `scrollTension` across configuration changes, as long as it has an `android:id`. The bitmap itself,
-`animationDurationMillis`, `isAntialiasingEnabled` and the listeners are not saved: set them again when the activity
-or fragment is recreated.
+margins, scroll margins, `scrollTensionEnabled` and `scrollTension` across configuration changes, as long as it has an `android:id`.
+`regionDecodingEnabled`, `hardwareBitmapsEnabled` and `cachedLevelsMemoryBudget` are saved too. The bitmap or image
+source itself, `animationDurationMillis`, `isAntialiasingEnabled`, `imageLoadListener`, `imageOverlayDrawer` and the
+other listeners are not saved: set them again when the activity or fragment is recreated.

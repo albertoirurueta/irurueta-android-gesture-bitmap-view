@@ -123,6 +123,7 @@ sonar {
 
 dependencies {
     implementation(libs.material)
+    implementation(libs.androidx.exifinterface)
     testImplementation(libs.junit)
     testImplementation(libs.mockk.android)
     testImplementation(libs.robolectric)

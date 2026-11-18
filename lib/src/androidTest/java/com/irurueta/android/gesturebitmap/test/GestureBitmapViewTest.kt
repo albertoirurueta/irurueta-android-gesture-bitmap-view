@@ -17,6 +17,8 @@
 package com.irurueta.android.gesturebitmap.test
 
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Color
 import android.graphics.Matrix
 import android.os.Bundle
 import androidx.test.core.app.launchActivity
@@ -194,7 +196,9 @@ class GestureBitmapViewTest {
         assertTrue(view.scrollEnabled)
         assertTrue(view.twoFingerScrollEnabled)
         assertTrue(view.doubleTapEnabled)
-        assertNotNull(view.bitmap)
+        // app:src is a raster drawable, so it is decoded by regions through an image source
+        assertNull(view.bitmap)
+        assertNotNull(view.imageSource)
         assertEquals(GestureBitmapView.DisplayType.FIT_X_CENTER, view.displayType)
         assertEquals(GestureBitmapView.DEFAULT_MIN_SCALE, view.minScale, 0.0f)
         assertEquals(GestureBitmapView.DEFAULT_MAX_SCALE, view.maxScale, 0.0f)
@@ -1058,10 +1062,10 @@ class GestureBitmapViewTest {
 
         // after state has been recovered, parameters are restored.
         // Bitmaps are not restored, since they will be recycled and it would make
-        // bundles to exceed their maximum size, however in this test, the bitmap
+        // bundles to exceed their maximum size, however in this test, the image
         // reappears because it is provided during construction as part of the layout
         // xml parameters
-        assertNotNull(view.bitmap)
+        assertNotNull(view.imageSource)
         val transformationParameters = view.transformationParameters
         assertEquals(transformationParameters.scale, 1.1, ABSOLUTE_ERROR)
         assertEquals(transformationParameters.rotationAngle, Math.PI / 10.0, ABSOLUTE_ERROR)
@@ -1494,6 +1498,128 @@ class GestureBitmapViewTest {
         assertEquals(kotlin.math.sign(angleAtRelease), kotlin.math.sign(angleAfterFling), 0.0)
     }
 
+    @Test
+    fun imageSource_loadsPreviewAndDetailWithoutChangingDisplayMatrix() {
+        val recorder = ImageLoadRecorder()
+        val view = prepareSmallView()
+        setSource(view, recorder, ImageSources.fromAsset(assets(), QUADRANTS_ASSET), 0L)
+        assertTrue(recorder.awaitPreviews(1))
+
+        val detailsBefore = recorder.detailCount
+        var matrixAfterZoom: Matrix? = null
+        activityScenarioRule.scenario.onActivity {
+            GestureBitmapViewTestHelper.zoomAtCenter(view, HIGH_SCALE)
+            matrixAfterZoom = view.displayTransformationMatrix
+        }
+        assertTrue(recorder.awaitDetails(detailsBefore + 1))
+        assertEquals(0, recorder.failureCount)
+
+        assertEquals(matrixAfterZoom, view.displayTransformationMatrix)
+        assertEquals(HIGH_SCALE, view.transformationParameters.scale, ABSOLUTE_ERROR)
+    }
+
+    @Test
+    fun draw_withHardwareBitmapsOnSoftwareCanvas_doesNotThrow() {
+        val recorder = ImageLoadRecorder()
+        val view = prepareSmallView()
+        view.hardwareBitmapsEnabled = true
+        setSource(view, recorder, ImageSources.fromAsset(assets(), QUADRANTS_ASSET), 0L)
+        assertTrue(recorder.awaitPreviews(1))
+
+        // level bitmaps are hardware bitmaps, which cannot be drawn on a software canvas
+        // unless the view draws a software copy of them
+        val low = drawOnSoftwareCanvas(view)
+        assertNotEquals(Color.TRANSPARENT, low.getPixel(view.width / 2, view.height / 2))
+
+        val detailsBefore = recorder.detailCount
+        activityScenarioRule.scenario.onActivity {
+            GestureBitmapViewTestHelper.zoomAtCenter(view, HIGH_SCALE)
+        }
+        assertTrue(recorder.awaitDetails(detailsBefore + 1))
+        val high = drawOnSoftwareCanvas(view)
+        assertNotEquals(Color.TRANSPARENT, high.getPixel(view.width / 2, view.height / 2))
+    }
+
+    @Test
+    fun invalidateImage_afterEditingBitmapImageSource_changesDrawnPixels() {
+        val recorder = ImageLoadRecorder()
+        val view = prepareSmallView()
+        val bitmap = Bitmap.createBitmap(400, 300, Bitmap.Config.ARGB_8888)
+        bitmap.eraseColor(Color.RED)
+        setSource(view, recorder, BitmapImageSource(bitmap), null)
+        assertTrue(recorder.awaitPreviews(1))
+        assertTrue(waitForCenterColor(view, Color.RED))
+
+        // low scale
+        editBitmap(bitmap, Color.BLUE)
+        activityScenarioRule.scenario.onActivity { view.invalidateImage() }
+        assertTrue(waitForCenterColor(view, Color.BLUE))
+
+        // high scale
+        activityScenarioRule.scenario.onActivity {
+            GestureBitmapViewTestHelper.zoomAtCenter(view, HIGH_SCALE)
+        }
+        assertTrue(waitForCenterColor(view, Color.BLUE))
+        editBitmap(bitmap, Color.GREEN)
+        activityScenarioRule.scenario.onActivity { view.invalidateImage() }
+        assertTrue(waitForCenterColor(view, Color.GREEN))
+    }
+
+    private fun assets() = InstrumentationRegistry.getInstrumentation().context.assets
+
+    private fun prepareSmallView(): GestureBitmapView {
+        val view = this.view ?: throw IllegalStateException("view not available")
+        activityScenarioRule.scenario.onActivity {
+            GestureBitmapViewTestHelper.resize(view)
+        }
+        assertTrue(
+            GestureBitmapViewTestHelper.awaitSize(view, GestureBitmapViewTestHelper.SMALL_VIEW_SIZE)
+        )
+        return view
+    }
+
+    private fun setSource(
+        view: GestureBitmapView,
+        recorder: ImageLoadRecorder,
+        source: ImageSource,
+        budget: Long?
+    ) {
+        activityScenarioRule.scenario.onActivity {
+            if (budget != null) {
+                // keeps the preview only, so that zooming in requires a detail patch
+                view.cachedLevelsMemoryBudget = budget
+            }
+            view.imageLoadListener = recorder
+            view.setImageSource(source)
+        }
+    }
+
+    private fun editBitmap(bitmap: Bitmap, color: Int) {
+        synchronized(bitmap) {
+            bitmap.eraseColor(color)
+        }
+    }
+
+    private fun drawOnSoftwareCanvas(view: GestureBitmapView): Bitmap {
+        var bitmap: Bitmap? = null
+        activityScenarioRule.scenario.onActivity {
+            // a bitmap backed canvas is not hardware accelerated
+            bitmap = GestureBitmapViewTestHelper.draw(view)
+        }
+        return bitmap ?: throw IllegalStateException("view could not be drawn")
+    }
+
+    private fun waitForCenterColor(view: GestureBitmapView, color: Int): Boolean {
+        repeat(POLL_RETRIES) {
+            val bitmap = drawOnSoftwareCanvas(view)
+            if (bitmap.getPixel(view.width / 2, view.height / 2) == color) {
+                return true
+            }
+            Thread.sleep(POLL_INTERVAL_MILLIS)
+        }
+        return false
+    }
+
     private fun reset() {
         topBoundReached = 0
         bottomBoundReached = 0
@@ -1537,5 +1663,7 @@ class GestureBitmapViewTest {
         private const val TIMEOUT = 20000L
         private const val POLL_RETRIES = 50
         private const val POLL_INTERVAL_MILLIS = 100L
+        private const val QUADRANTS_ASSET = "quadrants.jpg"
+        private const val HIGH_SCALE = 10.0
     }
 }

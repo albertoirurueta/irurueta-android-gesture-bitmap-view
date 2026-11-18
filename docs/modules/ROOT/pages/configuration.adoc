@@ -14,8 +14,42 @@ from the constants in `GestureBitmapView.Companion` and the property initializer
 |`bitmap`
 |`Bitmap?`
 |`null`
-|Bitmap to display. Setting it resets the transformation; the previously held bitmap is recycled. See also
+|Bitmap to display; `null` while an `imageSource` is set. Setting it resets the transformation; the previously held bitmap is recycled. See also
 `setBitmap(bitmap, resetMatrices)` and `setDrawable(drawable)`.
+
+|`imageSource`
+|`ImageSource?`
+|`null`
+|Source of the image, decoded by regions. Setting it replaces any bitmap or source and resets the transformation; the
+previous source is closed, and so is this one when it is replaced. See xref:usage.adoc#large-images[Large images].
+
+|`regionDecodingEnabled`
+|`Boolean`
+|`true`
+|Whether images set through an `ImageSource` are decoded by regions at several resolutions (`true`) or whole at full
+resolution (`false`). Changing it reconfigures the current image.
+
+|`hardwareBitmapsEnabled`
+|`Boolean`
+|`true`
+|Whether decoded images are hardware bitmaps. They are only used when the view is hardware accelerated. Changing it
+reconfigures the current image.
+
+|`cachedLevelsMemoryBudget`
+|`Long`
+|`DEFAULT_CACHED_LEVELS_MEMORY_BUDGET`
+|Bytes for the decoded resolution levels. The default means 4 times the pixels of the view, 4 bytes each; `0` keeps only
+the preview. Negative values throw `IllegalArgumentException`.
+
+|`imageLoadListener`
+|`OnImageLoadListener?`
+|`null`
+|Notified when the preview and details are decoded, or decoding fails.
+
+|`imageOverlayDrawer`
+|`ImageOverlayDrawer?`
+|`null`
+|Draws on top of the image, on a canvas expressed in upright image pixels and clipped to the image.
 
 |`displayType`
 |`DisplayType`
@@ -155,7 +189,9 @@ coordinates (base and gesture transformations combined).
 `topBoundReachedListener`, `bottomBoundReachedListener`, `leftBoundReachedListener`, `rightBoundReachedListener`,
 `minScaleReachedListener`, `maxScaleReachedListener`, `scaleAnimationCompletedListener`,
 `scrollAnimationCompletedListener`, `rotateAndTranslateAnimationCompletedListener` and `doubleTapListener`, all
-`null` by default. See xref:usage.adoc#listeners[Listeners].
+`null` by default. See xref:usage.adoc#listeners[Listeners]. `imageLoadListener` (`OnImageLoadListener`:
+`onPreviewLoaded(view)`, `onDetailLoaded(view)` and `onImageLoadFailed(view, error)`) and `imageOverlayDrawer`
+(`ImageOverlayDrawer.onDrawOverImage(view, canvas)`) are also `null` by default.
 
 == Methods
 
@@ -168,6 +204,26 @@ coordinates (base and gesture transformations combined).
 
 |`setDrawable(drawable: Drawable?)`
 |Sets the bitmap from a drawable at its intrinsic size; bitmap drawables are never scaled up by screen density.
+
+|`setImageSource(source: ImageSource?, resetMatrices: Boolean = true)`
+|Sets the source of the image, decoded by regions. The view owns the source and closes it when replaced.
+
+|`setImageResource(resId: Int, resetMatrices: Boolean = true)`
+|Sets a raster drawable resource, decoded by regions. Throws `IOException` if it cannot be read.
+
+|`setImageUri(uri: Uri, resetMatrices: Boolean = true)`
+|Sets a content URI, decoded by regions. Throws `IOException` if it cannot be read.
+
+|`setImageFile(file: File, resetMatrices: Boolean = true)`
+|Sets a file, decoded by regions. Throws `IOException` if it cannot be read.
+
+|`invalidateImage(region: Rect? = null)`
+|Notifies that the image contents changed. `region` is in upright image pixels, `null` for the whole image. See
+xref:editing.adoc[Updating image contents].
+
+|`mapViewToImage(x: Float, y: Float, result: PointF): Boolean`
+|Maps a view point into upright image pixels. Returns `false` when there is no image or the display matrix cannot be
+inverted.
 
 |`resetTransformationParameters()`
 |Cancels animations and resets the gesture transformation, returning to the initial display.
@@ -183,7 +239,8 @@ Declared in `lib/src/main/res/values/attrs.xml` (styleable `GestureBitmapView`).
 |===
 |Attribute |Format |Property / values
 
-|`app:src` |reference |Drawable passed to `setDrawable`.
+|`app:src` |reference |Drawable passed to `setDrawable`. A raster resource (JPEG, PNG, WebP) is decoded by regions instead
+(EXIF applied, size of the file in pixels), unless `regionDecodingEnabled` is `false`.
 |`app:displayType` |enum |`none`, `fit_if_bigger`, `fit_x_top`, `fit_x_bottom`, `fit_x_center`, `fit_y_left`,
 `fit_y_right`, `fit_y_center`, `center_crop` (see xref:usage.adoc#_choosing_a_display_type[display types]).
 |`app:animationDurationMillis` |integer |`animationDurationMillis`
@@ -205,10 +262,13 @@ Declared in `lib/src/main/res/values/attrs.xml` (styleable `GestureBitmapView`).
 |`app:bottomScrollMargin` |float |`bottomScrollMargin`
 |`app:scrollTensionEnabled` |boolean |`scrollTensionEnabled`
 |`app:scrollTension` |float |`scrollTension`
+|`app:regionDecodingEnabled` |boolean |`regionDecodingEnabled`
+|`app:hardwareBitmapsEnabled` |boolean |`hardwareBitmapsEnabled`
+|`app:cachedLevelsMemoryBudget` |integer |`cachedLevelsMemoryBudget`
 |===
 
-`bitmap` (other than through `app:src`), `isAntialiasingEnabled`, `transformationParameters` and the listeners can only
-be set from code.
+`bitmap` (other than through `app:src`), `imageSource`, `isAntialiasingEnabled`, `transformationParameters`, the
+listeners and `imageOverlayDrawer` can only be set from code.
 
 == Default constants
 
@@ -225,6 +285,7 @@ be set from code.
 |`DEFAULT_MIN_SCALE_MARGIN` |`0.1f`
 |`DEFAULT_MAX_SCALE_MARGIN` |`1.0f`
 |`DEFAULT_SCROLL_MARGIN` |`100.0f`
+|`DEFAULT_CACHED_LEVELS_MEMORY_BUDGET` |`Long.MAX_VALUE` (sentinel: 4 times the pixels of the view, 4 bytes each)
 |===
 
 == MetricTransformationParameters
@@ -268,3 +329,26 @@ val matrix = MetricTransformationParameters(scale = 2.0).toMatrix()
 
 `class InvalidMatrixException : RuntimeException()`. Thrown by `MetricTransformationParameters.fromMatrix` when the
 matrix has perspective terms, unequal scale on both axes, shear, or a zero homogeneous scale.
+
+== Image sources
+
+[cols="2,4",options="header"]
+|===
+|Type |Description
+
+|`ImageSource`
+|Interface extending `Closeable`: `storedWidth`, `storedHeight`, `orientation` (EXIF), `decodeRegion(region, sampleSize,
+config, reuse)` (worker thread) and `contentChanged()` (default no-op, called before decoding again after
+`invalidateImage`).
+
+|`RegionDecoderImageSource`
+|Source decoding regions with `BitmapRegionDecoder` from an opener `() -> InputStream`. Used by the factories below.
+
+|`ImageSources`
+|Factories `fromResource(resources, resId)`, `fromAsset(assets, path)`, `fromFile(file)`,
+`fromUri(contentResolver, uri)` and `fromBytes(bytes)`.
+
+|`BitmapImageSource`
+|Source backed by a caller-owned bitmap held whole in memory, never recycled by the source. Synchronize on the bitmap
+while drawing on it.
+|===

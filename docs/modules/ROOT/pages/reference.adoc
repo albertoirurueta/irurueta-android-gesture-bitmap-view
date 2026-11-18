@@ -22,6 +22,24 @@ workflow.
 |CI builds with unit and instrumented test results.
 |===
 
+== Related pages
+
+[cols="1,3",options="header"]
+|===
+|Page
+|Description
+
+|xref:usage.adoc#large-images[Large images]
+|`ImageSource`, `ImageSources`, `setImageResource`, `setImageUri`, `setImageFile`, `regionDecodingEnabled`,
+`hardwareBitmapsEnabled`, `cachedLevelsMemoryBudget` and `OnImageLoadListener`.
+
+|xref:editing.adoc[Updating image contents]
+|`BitmapImageSource`, `invalidateImage`, `ImageOverlayDrawer` and `mapViewToImage`.
+
+|xref:configuration.adoc[Configuration reference]
+|Every property, method, XML attribute and constant.
+|===
+
 == Links of interest
 
 [cols="1,3",options="header"]
