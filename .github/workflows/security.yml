@@ -38,11 +38,17 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:
           languages: java-kotlin
-          build-mode: autobuild
+          build-mode: manual
+      # Build explicitly instead of using autobuild, whose dependency proxy init script can fail to resolve
+      # Gradle plugin dependencies. Kotlin sources are only extracted while they are compiled.
+      - name: Build
+        run: ./gradlew --no-daemon --no-build-cache --no-configuration-cache -Pkotlin.compiler.execution.strategy=in-process assembleDebug
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@v4
 
