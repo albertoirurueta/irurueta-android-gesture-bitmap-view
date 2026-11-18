@@ -11,7 +11,7 @@ plugins {
     alias(libs.plugins.publish)
 }
 
-val libraryVersion = "1.2.7"
+val libraryVersion = "1.3.0"
 
 android {
     namespace = "com.irurueta.android.gesturebitmap"
