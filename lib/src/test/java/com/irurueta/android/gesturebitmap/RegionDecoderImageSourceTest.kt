@@ -56,29 +56,6 @@ class RegionDecoderImageSourceTest {
         unmockkStatic(BitmapRegionDecoder::class)
     }
 
-    private fun mockDecoder(width: Int, height: Int): BitmapRegionDecoder {
-        val decoder = mockk<BitmapRegionDecoder>(relaxed = true)
-        every { decoder.width } returns width
-        every { decoder.height } returns height
-        decoders.add(decoder)
-        return decoder
-    }
-
-    private fun stubFactory(vararg results: BitmapRegionDecoder?) {
-        var index = 0
-        every { BitmapRegionDecoder.newInstance(any<InputStream>()) } answers {
-            results[minOf(index++, results.size - 1)]
-        }
-        every { BitmapRegionDecoder.newInstance(any<InputStream>(), any()) } answers {
-            results[minOf(index++, results.size - 1)]
-        }
-    }
-
-    private fun opener(): InputStream {
-        openCount++
-        return ByteArrayInputStream(ByteArray(8))
-    }
-
     @Test
     fun constructor_readsSize() {
         stubFactory(mockDecoder(100, 200))
@@ -134,9 +111,61 @@ class RegionDecoderImageSourceTest {
 
         assertThrows(IllegalStateException::class.java) { source.contentChanged() }
 
-        verify { first.recycle() }
+        // the previous decoder is kept, so the source is still usable
+        verify(exactly = 0) { first.recycle() }
         verify { second.recycle() }
-        assertNull(source.decodeRegion(Rect(0, 0, 10, 10), 1, Bitmap.Config.ARGB_8888, null))
+        val result = mockk<Bitmap>()
+        every { first.decodeRegion(any(), any()) } returns result
+        assertSame(result, source.decodeRegion(Rect(0, 0, 10, 10), 1, Bitmap.Config.ARGB_8888, null))
+    }
+
+    @Test
+    fun contentChanged_whenImageCannotBeOpened_keepsPreviousDecoder() {
+        val first = mockDecoder(100, 200)
+        stubFactory(first, null)
+        val source = RegionDecoderImageSource { opener() }
+
+        assertThrows(IOException::class.java) { source.contentChanged() }
+
+        verify(exactly = 0) { first.recycle() }
+        val result = mockk<Bitmap>()
+        every { first.decodeRegion(any(), any()) } returns result
+        assertSame(result, source.decodeRegion(Rect(0, 0, 10, 10), 1, Bitmap.Config.ARGB_8888, null))
+    }
+
+    @Test
+    fun contentChanged_whenClosed_doesNothing() {
+        val decoder = mockDecoder(100, 200)
+        stubFactory(decoder)
+        val source = RegionDecoderImageSource { opener() }
+        source.close()
+        val opened = openCount
+
+        source.contentChanged()
+
+        assertEquals(opened, openCount)
+    }
+
+    @Test
+    fun decodeRegion_withReuseOfDifferentSize_doesNotSetInBitmap() {
+        val decoder = mockDecoder(100, 200)
+        stubFactory(decoder)
+        val source = RegionDecoderImageSource { opener() }
+        val options = mutableListOf<BitmapFactory.Options>()
+        every { decoder.decodeRegion(any(), capture(options)) } returns null
+        val reuse = mockk<Bitmap>()
+        every { reuse.isMutable } returns true
+        every { reuse.isRecycled } returns false
+        every { reuse.width } returns 10
+        every { reuse.height } returns 12
+
+        // decoded size is 12x12, which is not the size of the bitmap to reuse
+        source.decodeRegion(Rect(0, 0, 48, 48), 4, Bitmap.Config.ARGB_8888, reuse)
+        // decoded size cannot be predicted when the region is not a multiple of the sample size
+        source.decodeRegion(Rect(0, 0, 41, 48), 4, Bitmap.Config.ARGB_8888, reuse)
+
+        assertNull(options[0].inBitmap)
+        assertNull(options[1].inBitmap)
     }
 
     @Test
@@ -162,7 +191,10 @@ class RegionDecoderImageSourceTest {
         every { decoder.decodeRegion(any(), capture(options)) } returns result
         val reuse = mockk<Bitmap>()
         every { reuse.isMutable } returns true
-        val region = Rect(0, 0, 50, 50)
+        every { reuse.isRecycled } returns false
+        every { reuse.width } returns 12
+        every { reuse.height } returns 12
+        val region = Rect(0, 0, 48, 48)
 
         assertSame(result, source.decodeRegion(region, 4, Bitmap.Config.RGB_565, reuse))
 
@@ -206,5 +238,28 @@ class RegionDecoderImageSourceTest {
 
         every { decoder.decodeRegion(any(), any()) } throws OutOfMemoryError()
         assertNull(source.decodeRegion(region, 1, Bitmap.Config.ARGB_8888, null))
+    }
+
+    private fun mockDecoder(width: Int, height: Int): BitmapRegionDecoder {
+        val decoder = mockk<BitmapRegionDecoder>(relaxed = true)
+        every { decoder.width } returns width
+        every { decoder.height } returns height
+        decoders.add(decoder)
+        return decoder
+    }
+
+    private fun stubFactory(vararg results: BitmapRegionDecoder?) {
+        var index = 0
+        every { BitmapRegionDecoder.newInstance(any<InputStream>()) } answers {
+            results[minOf(index++, results.size - 1)]
+        }
+        every { BitmapRegionDecoder.newInstance(any<InputStream>(), any()) } answers {
+            results[minOf(index++, results.size - 1)]
+        }
+    }
+
+    private fun opener(): InputStream {
+        openCount++
+        return ByteArrayInputStream(ByteArray(8))
     }
 }

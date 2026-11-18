@@ -66,15 +66,6 @@ import java.util.concurrent.Executor
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class DocumentationExamplesTest {
 
-    /**
-     * Stands for the `R` class of the application used by the snippets (`R.drawable.image`).
-     */
-    private object R {
-        object drawable {
-            var image = 0
-        }
-    }
-
     private val direct = Executor { it.run() }
 
     private lateinit var context: Context
@@ -100,44 +91,8 @@ class DocumentationExamplesTest {
         unmockkStatic(BitmapRegionDecoder::class)
     }
 
-    // Robolectric cannot region decode, so a decoder reporting the size of the test images is used
-    private fun stubDecoder() {
-        val decoder = mockk<BitmapRegionDecoder>(relaxed = true)
-        every { decoder.width } returns IMAGE_SIZE
-        every { decoder.height } returns IMAGE_SIZE
-        mockkStatic(BitmapRegionDecoder::class)
-        every { BitmapRegionDecoder.newInstance(any<InputStream>()) } returns decoder
-        every { BitmapRegionDecoder.newInstance(any<InputStream>(), any()) } returns decoder
-    }
-
-    private fun encodedPng(color: Int, size: Int = IMAGE_SIZE): ByteArray {
-        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-        bitmap.eraseColor(color)
-        val stream = ByteArrayOutputStream()
-        bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
-        bitmap.recycle()
-        return stream.toByteArray()
-    }
-
-    private fun tempFile(color: Int): File {
-        val file = File.createTempFile("docs", ".png")
-        file.writeBytes(encodedPng(color))
-        tempFiles.add(file)
-        return file
-    }
-
-    private fun idle() {
-        shadowOf(Looper.getMainLooper()).idle()
-    }
-
-    private fun drawView(): Bitmap {
-        val result = Bitmap.createBitmap(VIEW_SIZE, VIEW_SIZE, Bitmap.Config.ARGB_8888)
-        view.draw(Canvas(result))
-        return result
-    }
-
     @Test
-    fun setImageResource() {
+    fun setImageResource_withRasterResource_setsImageSource() {
         // tag::setImageResource[]
         // R.drawable.image is a JPEG, PNG or WebP resource
         view.setImageResource(R.drawable.image)
@@ -148,7 +103,7 @@ class DocumentationExamplesTest {
     }
 
     @Test
-    fun setImageUri() {
+    fun setImageUri_withFileUri_setsImageSource() {
         val file = tempFile(Color.RED)
         // tag::setImageUri[]
         // a content:// or file:// URI, for instance returned by the system photo picker
@@ -161,7 +116,7 @@ class DocumentationExamplesTest {
     }
 
     @Test
-    fun setImageFile() {
+    fun setImageFile_withAndWithoutResettingMatrices_setsImageSource() {
         val file = tempFile(Color.GREEN)
         // tag::setImageFile[]
         view.setImageFile(file)
@@ -174,7 +129,7 @@ class DocumentationExamplesTest {
     }
 
     @Test
-    fun setImageSourceWithFactory() {
+    fun setImageSource_withSourceCreatedFromBytes_setsImageSource() {
         val bytes = encodedPng(Color.BLUE)
         // tag::setImageSource[]
         // other factories: fromResource, fromAsset, fromFile and fromUri
@@ -186,7 +141,7 @@ class DocumentationExamplesTest {
     }
 
     @Test
-    fun customImageSource() {
+    fun setImageSource_withCustomImageSource_usesItToDecodeRegions() {
         // tag::customImageSource[]
         // Generates a 20000 x 20000 pixels image procedurally. It is never held whole in memory.
         class CheckerboardImageSource : ImageSource {
@@ -232,7 +187,7 @@ class DocumentationExamplesTest {
     }
 
     @Test
-    fun regionDecodingDisabled() {
+    fun regionDecodingEnabled_whenDisabledBeforeSettingFile_keepsImageSource() {
         val file = tempFile(Color.RED)
         // tag::regionDecodingDisabled[]
         // images set through an ImageSource are decoded whole, at their full resolution
@@ -245,7 +200,7 @@ class DocumentationExamplesTest {
     }
 
     @Test
-    fun bitmapPath() {
+    fun bitmap_whenSet_holdsBitmapAndClearsImageSource() {
         val bitmap = Bitmap.createBitmap(IMAGE_SIZE, IMAGE_SIZE, Bitmap.Config.ARGB_8888)
         // tag::bitmapPath[]
         // the bitmap is held whole in memory; the view recycles it when it is replaced
@@ -257,7 +212,7 @@ class DocumentationExamplesTest {
     }
 
     @Test
-    fun cachedLevelsMemoryBudget() {
+    fun cachedLevelsMemoryBudget_whenSetBackToDefault_returnsDefaultValue() {
         // tag::cachedLevelsMemoryBudget[]
         // 32 MiB for the decoded levels
         view.cachedLevelsMemoryBudget = 32L * 1024L * 1024L
@@ -276,7 +231,7 @@ class DocumentationExamplesTest {
     }
 
     @Test
-    fun hardwareBitmapsDisabled() {
+    fun hardwareBitmapsEnabled_whenDisabled_returnsFalse() {
         // tag::hardwareBitmapsDisabled[]
         // decode into software bitmaps (for instance to read their pixels)
         view.hardwareBitmapsEnabled = false
@@ -286,7 +241,7 @@ class DocumentationExamplesTest {
     }
 
     @Test
-    fun imageLoadListener() {
+    fun imageLoadListener_whenFileIsLoaded_notifiesPreviewWithoutFailures() {
         val file = tempFile(Color.RED)
         // tag::imageLoadListener[]
         view.imageLoadListener = object : GestureBitmapView.OnImageLoadListener {
@@ -330,7 +285,7 @@ class DocumentationExamplesTest {
     }
 
     @Test
-    fun mutableBitmapWithInvalidateImage() {
+    fun invalidateImage_whenBitmapIsEdited_drawsEditedBitmap() {
         // tag::mutableBitmap[]
         val bitmap = Bitmap.createBitmap(1000, 1000, Bitmap.Config.ARGB_8888)
         view.bitmap = bitmap
@@ -345,7 +300,7 @@ class DocumentationExamplesTest {
     }
 
     @Test
-    fun bitmapImageSourceWithRegion() {
+    fun invalidateImage_withRegionOfBitmapImageSource_keepsBitmapAndImageSource() {
         val bitmap = Bitmap.createBitmap(1000, 1000, Bitmap.Config.ARGB_8888)
         bitmap.eraseColor(Color.BLUE)
         // tag::bitmapImageSource[]
@@ -367,7 +322,7 @@ class DocumentationExamplesTest {
     }
 
     @Test
-    fun rewrittenFileWithInvalidateImage() {
+    fun invalidateImage_whenFileIsRewritten_keepsImageSource() {
         val file = tempFile(Color.RED)
         val bytes = encodedPng(Color.GREEN)
         view.setImageFile(file)
@@ -387,7 +342,7 @@ class DocumentationExamplesTest {
     }
 
     @Test
-    fun completeDrawMode() {
+    fun dispatchTouchEvent_whenStrokeIsDrawn_commitsStrokeToBitmapOnUp() {
         val bitmap = Bitmap.createBitmap(IMAGE_SIZE, IMAGE_SIZE, Bitmap.Config.ARGB_8888)
         bitmap.eraseColor(Color.WHITE)
         // tag::drawMode[]
@@ -473,7 +428,79 @@ class DocumentationExamplesTest {
         assertFalse(bitmap.isRecycled)
     }
 
+    @Test
+    fun examples_inDocumentation_matchTaggedRegionsOfThisTest() {
+        val lines = File(TEST_SOURCE_PATH).readLines()
+        val starts = lines.indices.filter { lines[it].trim().startsWith(TAG_PREFIX) }
+        assertTrue(starts.isNotEmpty())
+
+        for (start in starts) {
+            val name = lines[start].trim().removePrefix(TAG_PREFIX).removeSuffix(TAG_SUFFIX)
+            val end = (start + 1 until lines.size).first { lines[it].trim() == "$END_PREFIX$name$TAG_SUFFIX" }
+            val expected = lines.subList(start + 1, end).joinToString("\n").trimIndent().trim()
+
+            val example = File(EXAMPLES_PATH, "$name.kt")
+            assertTrue("missing example ${example.path}", example.isFile)
+            assertEquals("example $name is out of date", expected, example.readText().trim())
+        }
+
+        // every published example comes from a tagged region
+        val published = File(EXAMPLES_PATH).listFiles { file -> file.extension == "kt" }
+        assertEquals(starts.size, published?.size)
+    }
+
+    // Robolectric cannot region decode, so a decoder reporting the size of the test images is used
+    private fun stubDecoder() {
+        val decoder = mockk<BitmapRegionDecoder>(relaxed = true)
+        every { decoder.width } returns IMAGE_SIZE
+        every { decoder.height } returns IMAGE_SIZE
+        mockkStatic(BitmapRegionDecoder::class)
+        every { BitmapRegionDecoder.newInstance(any<InputStream>()) } returns decoder
+        every { BitmapRegionDecoder.newInstance(any<InputStream>(), any()) } returns decoder
+    }
+
+    private fun encodedPng(color: Int, size: Int = IMAGE_SIZE): ByteArray {
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        bitmap.eraseColor(color)
+        val stream = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+        bitmap.recycle()
+        return stream.toByteArray()
+    }
+
+    private fun tempFile(color: Int): File {
+        val file = File.createTempFile("docs", ".png")
+        file.writeBytes(encodedPng(color))
+        tempFiles.add(file)
+        return file
+    }
+
+    private fun idle() {
+        shadowOf(Looper.getMainLooper()).idle()
+    }
+
+    private fun drawView(): Bitmap {
+        val result = Bitmap.createBitmap(VIEW_SIZE, VIEW_SIZE, Bitmap.Config.ARGB_8888)
+        view.draw(Canvas(result))
+        return result
+    }
+
+    /**
+     * Stands for the `R` class of the application used by the snippets (`R.drawable.image`).
+     */
+    private object R {
+        object drawable {
+            var image = 0
+        }
+    }
+
     private companion object {
+        const val TEST_SOURCE_PATH =
+            "src/test/java/com/irurueta/android/gesturebitmap/DocumentationExamplesTest.kt"
+        const val EXAMPLES_PATH = "../docs/modules/ROOT/examples"
+        const val TAG_PREFIX = "// tag::"
+        const val END_PREFIX = "// end::"
+        const val TAG_SUFFIX = "[]"
         const val TAG = "DocumentationExamples"
         const val VIEW_SIZE = 200
         const val IMAGE_SIZE = 100

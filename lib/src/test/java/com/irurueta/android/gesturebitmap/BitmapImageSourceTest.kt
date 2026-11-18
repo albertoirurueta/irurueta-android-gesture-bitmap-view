@@ -52,7 +52,7 @@ class BitmapImageSourceTest {
     }
 
     @Test
-    fun properties_returnBitmapSizeAndNormalOrientation() {
+    fun storedWidthStoredHeightAndOrientation_returnBitmapSizeAndNormalOrientation() {
         assertEquals(40, source.storedWidth)
         assertEquals(20, source.storedHeight)
         assertEquals(ImageOrientation.NORMAL, source.orientation)

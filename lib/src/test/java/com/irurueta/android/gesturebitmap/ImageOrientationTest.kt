@@ -26,16 +26,8 @@ import org.robolectric.RobolectricTestRunner
 @RunWith(RobolectricTestRunner::class)
 class ImageOrientationTest {
 
-    private fun map(orientation: Int, x: Float, y: Float): FloatArray {
-        val matrix = Matrix()
-        ImageOrientation.toMatrix(orientation, W, H, matrix)
-        val pts = floatArrayOf(x, y)
-        matrix.mapPoints(pts)
-        return pts
-    }
-
     @Test
-    fun uprightSize_swapsAxesOnlyForTransposingOrientations() {
+    fun uprightWidthAndUprightHeight_swapAxesOnlyForTransposingOrientations() {
         for (o in listOf(0, 1, 2, 3, 4, 9, -1)) {
             assertEquals(W, ImageOrientation.uprightWidth(o, W, H))
             assertEquals(H, ImageOrientation.uprightHeight(o, W, H))
@@ -79,6 +71,14 @@ class ImageOrientationTest {
             assertEquals("orientation $o x", e.first, p[0], 1e-6f)
             assertEquals("orientation $o y", e.second, p[1], 1e-6f)
         }
+    }
+
+    private fun map(orientation: Int, x: Float, y: Float): FloatArray {
+        val matrix = Matrix()
+        ImageOrientation.toMatrix(orientation, W, H, matrix)
+        val pts = floatArrayOf(x, y)
+        matrix.mapPoints(pts)
+        return pts
     }
 
     private companion object {

@@ -65,86 +65,6 @@ import kotlin.math.abs
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class GestureBitmapViewImageSourceTest {
 
-    private class FakeSource(
-        override val storedWidth: Int = IMAGE_W,
-        override val storedHeight: Int = IMAGE_H,
-        override val orientation: Int = ImageOrientation.NORMAL
-    ) : ImageSource {
-        val decodes = mutableListOf<Rect>()
-        var contentChangedCalls = 0
-        var contentChangedError: Exception? = null
-        var closed = false
-        var returnNull = false
-        var opaque = false
-
-        override fun decodeRegion(
-            region: Rect,
-            sampleSize: Int,
-            config: Bitmap.Config,
-            reuse: Bitmap?
-        ): Bitmap? {
-            decodes.add(Rect(region))
-            if (returnNull) {
-                return null
-            }
-            val w = (region.width() + sampleSize - 1) / sampleSize
-            val h = (region.height() + sampleSize - 1) / sampleSize
-            val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-            bitmap.eraseColor(Color.BLUE)
-            if (opaque) {
-                bitmap.setHasAlpha(false)
-            }
-            return bitmap
-        }
-
-        override fun contentChanged() {
-            contentChangedCalls++
-            contentChangedError?.let { throw it }
-        }
-
-        override fun close() {
-            closed = true
-        }
-    }
-
-    private class RecordingCanvas(bitmap: Bitmap) : Canvas(bitmap) {
-        var clipOutCalls = 0
-        val drawnConfigs = mutableListOf<Bitmap.Config?>()
-
-        override fun clipOutRect(rect: Rect): Boolean {
-            clipOutCalls++
-            return super.clipOutRect(rect)
-        }
-
-        override fun drawBitmap(bitmap: Bitmap, src: Rect?, dst: Rect, paint: Paint?) {
-            drawnConfigs.add(bitmap.config)
-            super.drawBitmap(bitmap, src, dst, paint)
-        }
-
-        override fun drawBitmap(bitmap: Bitmap, src: Rect?, dst: RectF, paint: Paint?) {
-            drawnConfigs.add(bitmap.config)
-            super.drawBitmap(bitmap, src, dst, paint)
-        }
-    }
-
-    private class Listener : GestureBitmapView.OnImageLoadListener {
-        var preview = 0
-        var detail = 0
-        val failures = mutableListOf<Throwable?>()
-
-        override fun onPreviewLoaded(view: GestureBitmapView) {
-            preview++
-        }
-
-        override fun onDetailLoaded(view: GestureBitmapView) {
-            detail++
-        }
-
-        override fun onImageLoadFailed(view: GestureBitmapView, error: Throwable?) {
-            failures.add(error)
-        }
-    }
-
     private val direct = Executor { it.run() }
 
     private lateinit var context: Context
@@ -162,48 +82,8 @@ class GestureBitmapViewImageSourceTest {
         unmockkStatic(BitmapRegionDecoder::class)
     }
 
-    private fun stubDecoder() {
-        val decoder = mockk<BitmapRegionDecoder>(relaxed = true)
-        every { decoder.width } returns 10
-        every { decoder.height } returns 20
-        mockkStatic(BitmapRegionDecoder::class)
-        every { BitmapRegionDecoder.newInstance(any<InputStream>()) } returns decoder
-        every { BitmapRegionDecoder.newInstance(any<InputStream>(), any()) } returns decoder
-    }
-
-    private fun idle() {
-        shadowOf(Looper.getMainLooper()).idle()
-    }
-
-    private fun createView(w: Int = VIEW_W, h: Int = VIEW_H): GestureBitmapView {
-        val view = GestureBitmapView(context)
-        view.imageExecutor = direct
-        view.layout(0, 0, w, h)
-        return view
-    }
-
-    private fun image(view: GestureBitmapView): MultiResolutionImage? =
-        view.getPrivateProperty("multiResolutionImage")
-
-    private fun uniqueFile(): File {
-        val file = File.createTempFile("gbv", ".png")
-        file.deleteOnExit()
-        val bitmap = Bitmap.createBitmap(16, 8, Bitmap.Config.ARGB_8888)
-        file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-        return file
-    }
-
-    private fun drawableId(name: String): Int =
-        context.resources.getIdentifier(name, "drawable", context.packageName)
-
-    private fun draw(view: GestureBitmapView, size: Int = CANVAS_SIZE): RecordingCanvas {
-        val canvas = RecordingCanvas(Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888))
-        view.draw(canvas)
-        return canvas
-    }
-
     @Test
-    fun defaults_haveExpectedValues() {
+    fun constructor_setsDefaultValues() {
         val view = GestureBitmapView(context)
 
         assertNull(view.imageSource)
@@ -295,7 +175,7 @@ class GestureBitmapViewImageSourceTest {
     }
 
     @Test
-    fun setImageSource_replacingSource_closesPrevious() {
+    fun setImageSource_whenReplacingSource_closesPrevious() {
         val view = createView()
         val other = FakeSource()
         view.setImageSource(source)
@@ -308,7 +188,7 @@ class GestureBitmapViewImageSourceTest {
     }
 
     @Test
-    fun setImageSource_null_closesSourceAndClearsImage() {
+    fun setImageSource_withNull_closesSourceAndClearsImage() {
         val view = createView()
         view.setImageSource(source)
 
@@ -334,7 +214,7 @@ class GestureBitmapViewImageSourceTest {
     }
 
     @Test
-    fun setBitmapToNull_whenSourceIsSet_closesSource() {
+    fun setBitmap_withNullWhenSourceIsSet_closesSource() {
         val view = createView()
         view.setImageSource(source)
 
@@ -391,7 +271,7 @@ class GestureBitmapViewImageSourceTest {
     }
 
     @Test
-    fun zoomingIn_requestsPatchWithoutChangingMatrices_andReleasesIt() {
+    fun transformationParameters_whenZoomingInAndOut_requestsAndReleasesPatchWithoutChangingBaseMatrix() {
         val view = createView()
         view.cachedLevelsMemoryBudget = 0L
         view.setImageSource(source)
@@ -421,7 +301,7 @@ class GestureBitmapViewImageSourceTest {
     }
 
     @Test
-    fun zoomingIn_whenFinestLevelIsCached_requestsNoPatch() {
+    fun transformationParameters_whenZoomingInAndFinestLevelIsCached_requestsNoPatch() {
         val view = createView()
         view.cachedLevelsMemoryBudget = 200L * 1024 * 1024
         view.setImageSource(source)
@@ -435,7 +315,7 @@ class GestureBitmapViewImageSourceTest {
     }
 
     @Test
-    fun flags_reconfigureCurrentImage() {
+    fun regionDecodingEnabled_whenChangedWithSourceSet_decodesImageAgain() {
         val view = createView()
         view.cachedLevelsMemoryBudget = 0L
         view.setImageSource(source)
@@ -459,7 +339,7 @@ class GestureBitmapViewImageSourceTest {
     }
 
     @Test
-    fun savedState_restoresNewProperties() {
+    fun onSaveAndRestoreInstanceState_restoresImageDecodingProperties() {
         val view = createView()
         view.regionDecodingEnabled = false
         view.hardwareBitmapsEnabled = false
@@ -475,7 +355,7 @@ class GestureBitmapViewImageSourceTest {
     }
 
     @Test
-    fun savedState_withoutNewKeys_restoresDefaults() {
+    fun onRestoreInstanceState_whenDecodingKeysAreMissing_restoresDefaultValues() {
         val view = createView()
         val state: Bundle = view.callPrivateFuncWithResult("onSaveInstanceState")!!
         state.remove("regionDecodingEnabled")
@@ -498,7 +378,7 @@ class GestureBitmapViewImageSourceTest {
     }
 
     @Test
-    fun detachAndAttach_releasesAndRecreatesImage() {
+    fun onDetachedFromWindow_whenAttachedAgain_releasesAndRecreatesImage() {
         val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
         val container = FrameLayout(activity)
         activity.setContentView(container)
@@ -529,7 +409,7 @@ class GestureBitmapViewImageSourceTest {
     }
 
     @Test
-    fun trimMemory_dropsPatchWhileAttached() {
+    fun onTrimMemory_whenAttached_dropsPatch() {
         val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
         val container = FrameLayout(activity)
         activity.setContentView(container)
@@ -548,13 +428,51 @@ class GestureBitmapViewImageSourceTest {
 
         assertNull(image.patchBitmap)
 
+        // detail is requested again when the view becomes visible
+        view.onVisibilityAggregated(true)
+        idle()
+
+        assertNotNull(image.patchBitmap)
+
         // no longer registered after detaching
         container.removeView(view)
         activity.onTrimMemory(ComponentCallbacks2.TRIM_MEMORY_COMPLETE)
     }
 
     @Test
-    fun listener_isNotifiedOfDetailAndFailure() {
+    fun onDraw_withImageLargerThanAssumedMaximumBitmapSize_decodesOnlyOnceDrawn() {
+        val large = FakeSource(LARGE_IMAGE_SIZE, LARGE_IMAGE_SIZE)
+        val view = createView()
+        val listener = Listener()
+        view.imageLoadListener = listener
+        view.regionDecodingEnabled = false
+
+        view.setImageSource(large)
+        idle()
+
+        // nothing is decoded, nor reported as failed, until the canvas reports its limit
+        assertTrue(large.decodes.isEmpty())
+        assertTrue(listener.failures.isEmpty())
+
+        draw(view)
+        idle()
+
+        assertEquals(1, large.decodes.size)
+        assertTrue(listener.failures.isEmpty())
+    }
+
+    @Test
+    fun constructor_keepsPlatformDefaultFilteringForPlainBitmaps() {
+        val view = createView()
+
+        val paint: Paint? = view.getPrivateProperty("bitmapPaint")
+
+        // plain bitmaps are drawn as before: filtering is whatever the platform defaults to
+        assertEquals(Paint().isFilterBitmap, requireNotNull(paint).isFilterBitmap)
+    }
+
+    @Test
+    fun imageLoadListener_whenDetailLoadsAndDecodingFails_isNotified() {
         val view = createView()
         val listener = Listener()
         view.imageLoadListener = listener
@@ -610,7 +528,9 @@ class GestureBitmapViewImageSourceTest {
         val bitmap = Bitmap.createBitmap(10, 10, Bitmap.Config.ARGB_8888)
         val canvas = RecordingCanvas(Bitmap.createBitmap(20, 20, Bitmap.Config.ARGB_8888))
 
-        view.callPrivateFunc("drawLevel", canvas, bitmap, Rect(0, 0, 5, 5))
+        renderer(view).callPrivateFunc(
+            "drawLevel", canvas, bitmap, Rect(0, 0, 5, 5), RectF(0.0f, 0.0f, 10.0f, 10.0f)
+        )
 
         assertEquals(listOf<Bitmap.Config?>(Bitmap.Config.ARGB_8888), canvas.drawnConfigs)
         assertFalse(bitmap.isRecycled)
@@ -632,7 +552,7 @@ class GestureBitmapViewImageSourceTest {
     }
 
     @Test
-    fun overlayDrawer_withSource_receivesUprightImageCanvas() {
+    fun imageOverlayDrawer_withSource_receivesUprightImageCanvas() {
         for (orientation in intArrayOf(
             ImageOrientation.NORMAL,
             ImageOrientation.ROTATE_90,
@@ -656,7 +576,7 @@ class GestureBitmapViewImageSourceTest {
     }
 
     @Test
-    fun overlayDrawer_withBitmap_receivesImageCanvas() {
+    fun imageOverlayDrawer_withBitmap_receivesImageCanvas() {
         for (scale in doubleArrayOf(1.0, 2.0)) {
             for (angle in doubleArrayOf(0.0, Math.PI / 2.0, Math.PI)) {
                 val view = createView(SMALL_W, SMALL_H)
@@ -665,49 +585,6 @@ class GestureBitmapViewImageSourceTest {
                     MetricTransformationParameters(scale, angle, 1000.0, 1000.0)
                 assertOverlay(view, 40, 20, scale == 1.0 && angle == 0.0)
             }
-        }
-    }
-
-    private fun FakeSource.uprightWidth() =
-        ImageOrientation.uprightWidth(orientation, storedWidth, storedHeight)
-
-    private fun FakeSource.uprightHeight() =
-        ImageOrientation.uprightHeight(orientation, storedWidth, storedHeight)
-
-    @Suppress("DEPRECATION")
-    private fun assertOverlay(view: GestureBitmapView, w: Int, h: Int, exact: Boolean) {
-        var calls = 0
-        var matrix: Matrix? = null
-        var clip: Rect? = null
-        view.imageOverlayDrawer = object : GestureBitmapView.ImageOverlayDrawer {
-            override fun onDrawOverImage(view: GestureBitmapView, canvas: Canvas) {
-                calls++
-                matrix = Matrix(canvas.matrix)
-                clip = canvas.clipBounds
-            }
-        }
-
-        draw(view)
-
-        assertEquals(1, calls)
-        val expected = FloatArray(9)
-        view.displayTransformationMatrix.getValues(expected)
-        val actual = FloatArray(9)
-        matrix!!.getValues(actual)
-        for (i in 0 until 9) {
-            assertEquals(expected[i], actual[i], 1e-3f)
-        }
-        val bounds = clip!!
-        // clip is never larger than the image rectangle
-        assertTrue("clip $bounds", bounds.left >= -CLIP_TOLERANCE && bounds.top >= -CLIP_TOLERANCE)
-        assertTrue("clip $bounds", bounds.right <= w + CLIP_TOLERANCE)
-        assertTrue("clip $bounds", bounds.bottom <= h + CLIP_TOLERANCE)
-        if (exact) {
-            // image is fully visible
-            assertTrue("clip $bounds", abs(bounds.right - w) <= CLIP_TOLERANCE)
-            assertTrue("clip $bounds", abs(bounds.bottom - h) <= CLIP_TOLERANCE)
-            assertTrue("clip $bounds", abs(bounds.left) <= CLIP_TOLERANCE)
-            assertTrue("clip $bounds", abs(bounds.top) <= CLIP_TOLERANCE)
         }
     }
 
@@ -834,7 +711,7 @@ class GestureBitmapViewImageSourceTest {
     }
 
     @Test
-    fun init_withRasterSrc_usesSource() {
+    fun constructor_withRasterSrc_usesSource() {
         stubDecoder()
         val view = GestureBitmapView(context, attributes("src" to "@drawable/test_raster"))
 
@@ -843,7 +720,7 @@ class GestureBitmapViewImageSourceTest {
     }
 
     @Test
-    fun init_withXmlDrawableSrc_usesDrawablePath() {
+    fun constructor_withXmlDrawableSrc_usesDrawablePath() {
         val view = GestureBitmapView(context, attributes("src" to "@drawable/test_vector"))
 
         assertNull(view.imageSource)
@@ -853,7 +730,7 @@ class GestureBitmapViewImageSourceTest {
     }
 
     @Test
-    fun init_withRegionDecodingDisabled_usesDrawablePath() {
+    fun constructor_withRegionDecodingDisabled_usesDrawablePath() {
         val view = GestureBitmapView(
             context,
             attributes(
@@ -870,7 +747,7 @@ class GestureBitmapViewImageSourceTest {
     }
 
     @Test
-    fun init_withAttributes_setsProperties() {
+    fun constructor_withAttributes_setsProperties() {
         val view = GestureBitmapView(
             context,
             attributes(
@@ -885,6 +762,93 @@ class GestureBitmapViewImageSourceTest {
         assertEquals(12345L, view.cachedLevelsMemoryBudget)
     }
 
+    private fun stubDecoder() {
+        val decoder = mockk<BitmapRegionDecoder>(relaxed = true)
+        every { decoder.width } returns 10
+        every { decoder.height } returns 20
+        mockkStatic(BitmapRegionDecoder::class)
+        every { BitmapRegionDecoder.newInstance(any<InputStream>()) } returns decoder
+        every { BitmapRegionDecoder.newInstance(any<InputStream>(), any()) } returns decoder
+    }
+
+    private fun idle() {
+        shadowOf(Looper.getMainLooper()).idle()
+    }
+
+    private fun createView(w: Int = VIEW_W, h: Int = VIEW_H): GestureBitmapView {
+        val view = GestureBitmapView(context)
+        view.imageExecutor = direct
+        view.layout(0, 0, w, h)
+        return view
+    }
+
+    private fun renderer(view: GestureBitmapView): SourceImageRenderer {
+        val renderer: SourceImageRenderer? = view.getPrivateProperty("sourceImageRenderer")
+        return requireNotNull(renderer)
+    }
+
+    private fun image(view: GestureBitmapView): MultiResolutionImage? = renderer(view).image
+
+    private fun uniqueFile(): File {
+        val file = File.createTempFile("gbv", ".png")
+        file.deleteOnExit()
+        val bitmap = Bitmap.createBitmap(16, 8, Bitmap.Config.ARGB_8888)
+        file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        return file
+    }
+
+    private fun drawableId(name: String): Int =
+        context.resources.getIdentifier(name, "drawable", context.packageName)
+
+    private fun draw(view: GestureBitmapView, size: Int = CANVAS_SIZE): RecordingCanvas {
+        val canvas = RecordingCanvas(Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888))
+        view.draw(canvas)
+        return canvas
+    }
+
+    private fun FakeSource.uprightWidth() =
+        ImageOrientation.uprightWidth(orientation, storedWidth, storedHeight)
+
+    private fun FakeSource.uprightHeight() =
+        ImageOrientation.uprightHeight(orientation, storedWidth, storedHeight)
+
+    @Suppress("DEPRECATION")
+    private fun assertOverlay(view: GestureBitmapView, w: Int, h: Int, exact: Boolean) {
+        var calls = 0
+        var matrix: Matrix? = null
+        var clip: Rect? = null
+        view.imageOverlayDrawer = object : GestureBitmapView.ImageOverlayDrawer {
+            override fun onDrawOverImage(view: GestureBitmapView, canvas: Canvas) {
+                calls++
+                matrix = Matrix(canvas.matrix)
+                clip = canvas.clipBounds
+            }
+        }
+
+        draw(view)
+
+        assertEquals(1, calls)
+        val expected = FloatArray(9)
+        view.displayTransformationMatrix.getValues(expected)
+        val actual = FloatArray(9)
+        matrix!!.getValues(actual)
+        for (i in 0 until 9) {
+            assertEquals(expected[i], actual[i], 1e-3f)
+        }
+        val bounds = clip!!
+        // clip is never larger than the image rectangle
+        assertTrue("clip $bounds", bounds.left >= -CLIP_TOLERANCE && bounds.top >= -CLIP_TOLERANCE)
+        assertTrue("clip $bounds", bounds.right <= w + CLIP_TOLERANCE)
+        assertTrue("clip $bounds", bounds.bottom <= h + CLIP_TOLERANCE)
+        if (exact) {
+            // image is fully visible
+            assertTrue("clip $bounds", abs(bounds.right - w) <= CLIP_TOLERANCE)
+            assertTrue("clip $bounds", abs(bounds.bottom - h) <= CLIP_TOLERANCE)
+            assertTrue("clip $bounds", abs(bounds.left) <= CLIP_TOLERANCE)
+            assertTrue("clip $bounds", abs(bounds.top) <= CLIP_TOLERANCE)
+        }
+    }
+
     private fun attributes(vararg values: Pair<String, String>): android.util.AttributeSet {
         val builder = Robolectric.buildAttributeSet()
         for ((name, value) in values) {
@@ -894,7 +858,88 @@ class GestureBitmapViewImageSourceTest {
         return builder.build()
     }
 
+    private class FakeSource(
+        override val storedWidth: Int = IMAGE_W,
+        override val storedHeight: Int = IMAGE_H,
+        override val orientation: Int = ImageOrientation.NORMAL
+    ) : ImageSource {
+        val decodes = mutableListOf<Rect>()
+        var contentChangedCalls = 0
+        var contentChangedError: Exception? = null
+        var closed = false
+        var returnNull = false
+        var opaque = false
+
+        override fun decodeRegion(
+            region: Rect,
+            sampleSize: Int,
+            config: Bitmap.Config,
+            reuse: Bitmap?
+        ): Bitmap? {
+            decodes.add(Rect(region))
+            if (returnNull) {
+                return null
+            }
+            val w = (region.width() + sampleSize - 1) / sampleSize
+            val h = (region.height() + sampleSize - 1) / sampleSize
+            val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            bitmap.eraseColor(Color.BLUE)
+            if (opaque) {
+                bitmap.setHasAlpha(false)
+            }
+            return bitmap
+        }
+
+        override fun contentChanged() {
+            contentChangedCalls++
+            contentChangedError?.let { throw it }
+        }
+
+        override fun close() {
+            closed = true
+        }
+    }
+
+    private class RecordingCanvas(bitmap: Bitmap) : Canvas(bitmap) {
+        var clipOutCalls = 0
+        val drawnConfigs = mutableListOf<Bitmap.Config?>()
+
+        override fun clipOutRect(rect: Rect): Boolean {
+            clipOutCalls++
+            return super.clipOutRect(rect)
+        }
+
+        override fun drawBitmap(bitmap: Bitmap, src: Rect?, dst: Rect, paint: Paint?) {
+            drawnConfigs.add(bitmap.config)
+            super.drawBitmap(bitmap, src, dst, paint)
+        }
+
+        override fun drawBitmap(bitmap: Bitmap, src: Rect?, dst: RectF, paint: Paint?) {
+            drawnConfigs.add(bitmap.config)
+            super.drawBitmap(bitmap, src, dst, paint)
+        }
+    }
+
+    private class Listener : GestureBitmapView.OnImageLoadListener {
+        var preview = 0
+        var detail = 0
+        val failures = mutableListOf<Throwable?>()
+
+        override fun onPreviewLoaded(view: GestureBitmapView) {
+            preview++
+        }
+
+        override fun onDetailLoaded(view: GestureBitmapView) {
+            detail++
+        }
+
+        override fun onImageLoadFailed(view: GestureBitmapView, error: Throwable?) {
+            failures.add(error)
+        }
+    }
+
     private companion object {
+        const val LARGE_IMAGE_SIZE = 5000
         const val IMAGE_W = 4000
         const val IMAGE_H = 3000
         const val VIEW_W = 1000

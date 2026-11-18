@@ -27,6 +27,7 @@ import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
+import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.max
@@ -111,17 +112,43 @@ internal class MultiResolutionImage(
      */
     private var patchStale = false
     /**
-     * Patch that must be decoded next, or null when no patch is needed.
+     * Sample size of the patch that must be decoded next, or [NO_SAMPLE] when no patch is needed.
      */
-    private var wantedPatch: PatchRequest? = null
+    private var wantedSample = NO_SAMPLE
     /**
-     * Last patch request whose decoding failed, not retried until it changes or the content is invalidated.
+     * Region in stored pixels of the patch that must be decoded next. Only meaningful while
+     * [wantedSample] is not [NO_SAMPLE].
      */
-    private var failedPatch: PatchRequest? = null
+    private val wantedRegion = Rect()
     /**
-     * Patch requirement computed for the last known state, used to check decoded patches are still useful.
+     * Sample size of the last patch whose decoding failed, or [NO_SAMPLE] when there is none. It is
+     * not retried until it changes or the content is invalidated.
      */
-    private var plan: PatchPlan? = null
+    private var failedSample = NO_SAMPLE
+    /**
+     * Region in stored pixels of the last patch whose decoding failed. Only meaningful while
+     * [failedSample] is not [NO_SAMPLE].
+     */
+    private val failedRegion = Rect()
+    /**
+     * Sample size a patch is planned for in the last known state, or [NO_SAMPLE] when no patch is
+     * planned. Used to check decoded patches are still useful.
+     */
+    private var planSample = NO_SAMPLE
+    /**
+     * Visible region in stored pixels of the last known state. Only meaningful while [planSample]
+     * is not [NO_SAMPLE].
+     */
+    private val planVisible = Rect()
+    /**
+     * Sample sizes of the decoded levels, kept in sync with [levels] to avoid allocations while
+     * choosing the level to draw.
+     */
+    private val available = ArrayList<Int>()
+    /**
+     * Corners of the view. Reused to avoid allocations.
+     */
+    private val corners = FloatArray(CORNER_VALUES)
 
     /**
      * Indicates whether a content change must be notified to the source.
@@ -294,9 +321,12 @@ internal class MultiResolutionImage(
         this.hardware = hardware
         this.regionDecoding = regionDecoding
         failedLevels.clear()
-        failedPatch = null
+        failedSample = NO_SAMPLE
         pendingLevels.clear()
-        refreshes.clear()
+        if (modeChanged) {
+            // every level is decoded again, so pending refreshes are no longer needed
+            refreshes.clear()
+        }
         if (modeChanged && patchBitmap != null) {
             patchStale = true
         }
@@ -371,7 +401,7 @@ internal class MultiResolutionImage(
             pendingInvalidate = true
         }
         failedLevels.clear()
-        failedPatch = null
+        failedSample = NO_SAMPLE
         pump()
     }
 
@@ -385,8 +415,7 @@ internal class MultiResolutionImage(
         }
         generation++
         pendingLevels.clear()
-        refreshes.clear()
-        wantedPatch = null
+        wantedSample = NO_SAMPLE
         releasePatch()
         val preview = levelSamples.firstOrNull() ?: return
         val iterator = levels.entries.iterator()
@@ -397,6 +426,7 @@ internal class MultiResolutionImage(
                 iterator.remove()
             }
         }
+        syncAvailable()
         if (!levels.containsKey(preview)) {
             pendingLevels.add(preview)
         }
@@ -414,29 +444,59 @@ internal class MultiResolutionImage(
         if (released) {
             return
         }
+        releaseBitmaps()
+        ownedExecutor?.shutdown()
+    }
+
+    /**
+     * Releases this instance (see [release]) and closes the source.
+     *
+     * The source is closed on the worker, after any decode in flight, so that the calling thread
+     * never waits for a decode to finish. It is closed on the calling thread only when the
+     * executor no longer accepts work.
+     */
+    fun close() {
+        val wasReleased = released
+        if (!wasReleased) {
+            releaseBitmaps()
+        }
+        try {
+            executor.execute { closeQuietly(source) }
+        } catch (_: RejectedExecutionException) {
+            closeQuietly(source)
+        }
+        if (!wasReleased) {
+            ownedExecutor?.shutdown()
+        }
+    }
+
+    /**
+     * Cancels pending work and recycles every bitmap decoded by this instance.
+     */
+    private fun releaseBitmaps() {
         released = true
         generation++
         pendingLevels.clear()
         refreshes.clear()
-        wantedPatch = null
+        wantedSample = NO_SAMPLE
         pendingInvalidate = false
         pendingInvalidateRegion = null
         for (bitmap in levels.values) {
             bitmap.recycle()
         }
         levels.clear()
+        available.clear()
         levelBitmap = null
         levelSample = NO_SAMPLE
         releasePatch()
-        ownedExecutor?.shutdown()
     }
 
     /**
-     * Releases this instance (see [release]) and closes the source.
+     * Copies the sample sizes of the decoded levels into [available].
      */
-    fun close() {
-        release()
-        source.close()
+    private fun syncAvailable() {
+        available.clear()
+        available.addAll(levels.keys)
     }
 
     /**
@@ -480,6 +540,7 @@ internal class MultiResolutionImage(
                 iterator.remove()
             }
         }
+        syncAvailable()
     }
 
     /**
@@ -505,19 +566,26 @@ internal class MultiResolutionImage(
      * @return true when the drawing state changed.
      */
     private fun evaluate(): Boolean {
-        wantedPatch = null
-        plan = null
-        val samples = levels.keys.toList()
-        if (samples.isEmpty()) {
+        wantedSample = NO_SAMPLE
+        planSample = NO_SAMPLE
+        if (available.isEmpty()) {
             return selectLevel(NO_SAMPLE)
         }
-        val choice = ResolutionPlanner.levelToDraw(samples, lastRequired)
-        val changed = selectLevel(choice.sample)
+        val choice = ResolutionPlanner.levelSampleToDraw(available, lastRequired)
+        val chosen = abs(choice)
+        val needsPatch = choice < 0
+        val changed = selectLevel(chosen)
         demandLevels()
-        if (!hasState || !regionDecoding) {
+        if (!regionDecoding) {
+            // a patch decoded before region decoding was disabled is dropped as soon as the
+            // full resolution level is displayed, since it is not refreshed in this mode
+            val had = chosen == 1 && releasePatch()
+            return had || changed
+        }
+        if (!hasState) {
             return changed
         }
-        if (!choice.needsPatch) {
+        if (!needsPatch) {
             val had = releasePatch()
             return had || changed
         }
@@ -526,25 +594,26 @@ internal class MultiResolutionImage(
         val h = source.storedHeight
         val used = ResolutionPlanner.patchRegion(
             lastInverse, lastViewW, lastViewH, w, h, lastRequired,
-            PATCH_PIXELS_FACTOR * lastViewW.toLong() * lastViewH, planned
+            PATCH_PIXELS_FACTOR * lastViewW.toLong() * lastViewH, planned, corners
         )
         if (planned.isEmpty) {
             return changed
         }
-        if (used >= choice.sample) {
+        if (used >= chosen) {
             val had = releasePatch()
             return had || changed
         }
         computeVisible(w, h)
-        plan = PatchPlan(used, Rect(visible))
+        planSample = used
+        planVisible.set(visible)
         val valid = patchBitmap != null && !patchStale &&
                 ResolutionPlanner.isPatchValid(patchRegion, patchSample, visible, used)
         if (valid || (scaling && (patchBitmap == null || patchSample != used))) {
             return changed
         }
-        val request = PatchRequest(Rect(planned), used)
-        if (!request.sameAs(failedPatch)) {
-            wantedPatch = request
+        if (failedSample != used || failedRegion != planned) {
+            wantedSample = used
+            wantedRegion.set(planned)
         }
         return changed
     }
@@ -556,7 +625,7 @@ internal class MultiResolutionImage(
         if (levelSamples.isEmpty()) {
             return
         }
-        val target = ResolutionPlanner.levelToDraw(levelSamples, lastRequired).sample
+        val target = abs(ResolutionPlanner.levelSampleToDraw(levelSamples, lastRequired))
         val running = inFlightJob
         for (sample in levelSamples) {
             val inFlight = running != null && running.kind == Kind.LEVEL && running.sample == sample &&
@@ -576,12 +645,15 @@ internal class MultiResolutionImage(
       * @param storedH height of the stored image in pixels.
      */
     private fun computeVisible(storedW: Int, storedH: Int) {
-        val points = floatArrayOf(
-            0.0f, 0.0f,
-            lastViewW.toFloat(), 0.0f,
-            lastViewW.toFloat(), lastViewH.toFloat(),
-            0.0f, lastViewH.toFloat()
-        )
+        val points = corners
+        points[0] = 0.0f
+        points[1] = 0.0f
+        points[2] = lastViewW.toFloat()
+        points[3] = 0.0f
+        points[4] = lastViewW.toFloat()
+        points[5] = lastViewH.toFloat()
+        points[6] = 0.0f
+        points[7] = lastViewH.toFloat()
         lastInverse.mapPoints(points)
         var minX = points[0]
         var maxX = points[0]
@@ -634,16 +706,14 @@ internal class MultiResolutionImage(
             pendingInvalidateRegion = null
             return Job(Kind.INVALIDATE, generation, NO_SAMPLE, region?.let { Rect(it) }, levelConfig, null, hardware)
         }
-        val request = wantedPatch
-        if (request != null) {
-            wantedPatch = null
+        if (wantedSample != NO_SAMPLE) {
+            val sample = wantedSample
+            val region = Rect(wantedRegion)
+            wantedSample = NO_SAMPLE
             return if (hardware) {
-                Job(Kind.PATCH, generation, request.sample, request.region, Bitmap.Config.HARDWARE, null, true)
+                Job(Kind.PATCH, generation, sample, region, Bitmap.Config.HARDWARE, null, true)
             } else {
-                Job(
-                    Kind.PATCH, generation, request.sample, request.region, Bitmap.Config.ARGB_8888,
-                    takeReuse(), false
-                )
+                Job(Kind.PATCH, generation, sample, region, Bitmap.Config.ARGB_8888, takeReuse(), false)
             }
         }
         while (refreshes.isNotEmpty()) {
@@ -825,6 +895,10 @@ internal class MultiResolutionImage(
     private fun onLevel(job: Job, bitmap: Bitmap?, error: Throwable?, stale: Boolean) {
         if (stale) {
             bitmap?.recycle()
+            if (job.refresh && job.hardware == hardware) {
+                // the content change is still pending for this level
+                addRefresh(job.sample, null)
+            }
             return
         }
         if (bitmap == null) {
@@ -835,6 +909,7 @@ internal class MultiResolutionImage(
             return
         }
         val old = levels.put(job.sample, bitmap)
+        syncAvailable()
         pruneLevels()
         val changed = evaluate()
         if (old != null && old !== bitmap) {
@@ -861,6 +936,10 @@ internal class MultiResolutionImage(
     private fun onRefresh(job: Job, bitmap: Bitmap?, error: Throwable?, stale: Boolean) {
         val region = job.region
         val target = levels[job.sample]
+        if (stale && region != null && job.hardware == hardware) {
+            // the content change is still pending for this level
+            addRefresh(job.sample, region)
+        }
         if (stale || bitmap == null || region == null || target == null || !target.isMutable) {
             bitmap?.recycle()
             if (!stale && bitmap == null) {
@@ -889,18 +968,23 @@ internal class MultiResolutionImage(
         val lent = job.reuse
         if (bitmap == null) {
             if (!stale) {
-                failedPatch = PatchRequest(region, job.sample)
+                failedSample = job.sample
+                failedRegion.set(region)
                 onFailed(error)
             }
             lent?.let { giveBack(it, null) }
             return
         }
-        val current = plan
-        val usable = !stale && current != null &&
-                ResolutionPlanner.isPatchValid(region, job.sample, current.visible, current.sample)
+        val usable = !stale && planSample != NO_SAMPLE &&
+                ResolutionPlanner.isPatchValid(region, job.sample, planVisible, planSample)
         if (!usable) {
-            bitmap.recycle()
-            lent?.let { giveBack(it, bitmap) }
+            if (lent != null && lent === bitmap) {
+                // the decoder reused the spare bitmap, which is kept for the next patch
+                giveBack(lent, null)
+            } else {
+                bitmap.recycle()
+                lent?.let { giveBack(it, bitmap) }
+            }
             notifyIfChanged(evaluate())
             return
         }
@@ -957,32 +1041,6 @@ internal class MultiResolutionImage(
     )
 
     /**
-     * Patch to be decoded.
-     *
-     * @property region region in stored pixels.
-     * @property sample sample size.
-     */
-    private class PatchRequest(val region: Rect, val sample: Int) {
-        /**
-         * Checks whether this request describes the same patch as another request.
-         *
-         * @param other request to compare with, or null.
-         * @return true when both requests have the same sample size and region.
-         */
-        fun sameAs(other: PatchRequest?): Boolean {
-            return other != null && other.sample == sample && other.region == region
-        }
-    }
-
-    /**
-     * Patch requirement of the last known state.
-     *
-     * @property sample sample size a patch is planned for.
-     * @property visible visible region in stored pixels.
-     */
-    private class PatchPlan(val sample: Int, val visible: Rect)
-
-    /**
      * Level to decode again.
      *
      * @property sample sample size of the level.
@@ -993,20 +1051,38 @@ internal class MultiResolutionImage(
     /**
      * Constants shared by [MultiResolutionImage] instances.
      */
-    private companion object {
+    companion object {
         /**
          * Patch budget as a multiple of the number of view pixels.
          */
-        const val PATCH_PIXELS_FACTOR = 2L
+        private const val PATCH_PIXELS_FACTOR = 2L
 
         /**
          * Sample size used when there is no bitmap.
          */
-        const val NO_SAMPLE = 0
+        private const val NO_SAMPLE = 0
 
         /**
          * Name of the thread owned by this class.
          */
-        const val THREAD_NAME = "MultiResolutionImage"
+        private const val THREAD_NAME = "MultiResolutionImage"
+
+        /**
+         * Number of values needed to store the four corners of the view.
+         */
+        private const val CORNER_VALUES = 8
+
+        /**
+         * Closes a source ignoring failures, since nothing can be done about them.
+         *
+         * @param source source to close.
+         */
+        fun closeQuietly(source: ImageSource) {
+            try {
+                source.close()
+            } catch (_: Exception) {
+                // nothing can be done when closing fails
+            }
+        }
     }
 }

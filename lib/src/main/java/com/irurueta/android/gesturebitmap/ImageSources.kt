@@ -20,7 +20,9 @@ import android.content.ContentResolver
 import android.content.res.AssetManager
 import android.content.res.Resources
 import android.graphics.BitmapFactory
+import android.graphics.BitmapRegionDecoder
 import android.net.Uri
+import android.os.Build
 import android.util.TypedValue
 import java.io.ByteArrayInputStream
 import java.io.File
@@ -66,15 +68,21 @@ object ImageSources {
     /**
      * Creates an image source from a file.
      *
+     * The file is read as needed while decoding, without copying it into memory.
+     *
      * @param file file containing the encoded image.
      * @return created image source, which must be closed when no longer needed.
      * @throws IOException if the file cannot be read or its format is not supported.
      */
     @JvmStatic
-    fun fromFile(file: File): ImageSource = RegionDecoderImageSource { FileInputStream(file) }
+    fun fromFile(file: File): ImageSource =
+        RegionDecoderImageSource({ FileInputStream(file) }, { openFileDecoder(file) })
 
     /**
      * Creates an image source from a content URI.
+     *
+     * When the URI is backed by a file it is read as needed while decoding, without copying it
+     * into memory. Otherwise the encoded image is read from a stream and kept in memory.
      *
      * @param contentResolver resolver used to open the URI.
      * @param uri URI of the encoded image.
@@ -83,10 +91,13 @@ object ImageSources {
      */
     @JvmStatic
     fun fromUri(contentResolver: ContentResolver, uri: Uri): ImageSource =
-        RegionDecoderImageSource {
-            contentResolver.openInputStream(uri)
-                ?: throw FileNotFoundException("Unable to open $uri")
-        }
+        RegionDecoderImageSource(
+            {
+                contentResolver.openInputStream(uri)
+                    ?: throw FileNotFoundException("Unable to open $uri")
+            },
+            { openUriDecoder(contentResolver, uri) }
+        )
 
     /**
      * Creates an image source from an encoded image held in memory.
@@ -129,6 +140,44 @@ object ImageSources {
             false
         } catch (_: IOException) {
             false
+        }
+    }
+
+    /**
+     * Opens a region decoder reading a file directly, without copying it into memory.
+     *
+     * @param file file containing the encoded image.
+     * @return region decoder, or null when the file cannot be region decoded.
+     * @throws IOException if the file cannot be read.
+     */
+    @Suppress("DEPRECATION")
+    private fun openFileDecoder(file: File): BitmapRegionDecoder? {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            BitmapRegionDecoder.newInstance(file.path)
+        } else {
+            BitmapRegionDecoder.newInstance(file.path, false)
+        }
+    }
+
+    /**
+     * Opens a region decoder reading the file behind a content URI directly, without copying it
+     * into memory.
+     *
+     * @param contentResolver resolver used to open the URI.
+     * @param uri URI of the encoded image.
+     * @return region decoder, or null when the URI is not backed by a file.
+     * @throws IOException if the URI cannot be read.
+     */
+    @Suppress("DEPRECATION")
+    private fun openUriDecoder(contentResolver: ContentResolver, uri: Uri): BitmapRegionDecoder? {
+        val descriptor = contentResolver.openFileDescriptor(uri, "r") ?: return null
+        // the decoder duplicates the descriptor, so it can be closed right away
+        return descriptor.use {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                BitmapRegionDecoder.newInstance(it)
+            } else {
+                BitmapRegionDecoder.newInstance(it.fileDescriptor, false)
+            }
         }
     }
 }

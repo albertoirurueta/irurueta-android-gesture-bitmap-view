@@ -1499,7 +1499,7 @@ class GestureBitmapViewTest {
     }
 
     @Test
-    fun imageSource_loadsPreviewAndDetailWithoutChangingDisplayMatrix() {
+    fun setImageSource_whenZoomedIn_loadsPreviewAndDetailWithoutChangingDisplayMatrix() {
         val recorder = ImageLoadRecorder()
         val view = prepareSmallView()
         setSource(view, recorder, ImageSources.fromAsset(assets(), QUADRANTS_ASSET), 0L)

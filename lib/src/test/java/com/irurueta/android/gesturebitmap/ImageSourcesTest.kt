@@ -16,6 +16,9 @@
 
 package com.irurueta.android.gesturebitmap
 
+import io.mockk.verify
+import java.io.FileDescriptor
+import android.os.ParcelFileDescriptor
 import android.content.ContentResolver
 import android.content.Context
 import android.graphics.BitmapRegionDecoder
@@ -45,8 +48,10 @@ class ImageSourcesTest {
 
     private val context: Context = ApplicationProvider.getApplicationContext()
 
-    private fun drawableId(name: String): Int =
-        context.resources.getIdentifier(name, "drawable", context.packageName)
+    @After
+    fun tearDown() {
+        unmockkStatic(BitmapRegionDecoder::class)
+    }
 
     @Test
     fun isRegionDecodable_withXmlDrawable_returnsFalse() {
@@ -85,6 +90,7 @@ class ImageSourcesTest {
     fun fromUri_whenResolverReturnsNull_throwsFileNotFoundException() {
         val resolver = mockk<ContentResolver>()
         val uri = Uri.parse("content://test/image")
+        every { resolver.openFileDescriptor(uri, "r") } returns null
         every { resolver.openInputStream(uri) } returns null
 
         assertThrows(FileNotFoundException::class.java) { ImageSources.fromUri(resolver, uri) }
@@ -95,20 +101,6 @@ class ImageSourcesTest {
         assertThrows(IOException::class.java) {
             ImageSources.fromAsset(context.assets, "missing.jpg")
         }
-    }
-
-    @After
-    fun tearDown() {
-        unmockkStatic(BitmapRegionDecoder::class)
-    }
-
-    private fun stubDecoder() {
-        val decoder = mockk<BitmapRegionDecoder>(relaxed = true)
-        every { decoder.width } returns 10
-        every { decoder.height } returns 20
-        mockkStatic(BitmapRegionDecoder::class)
-        every { BitmapRegionDecoder.newInstance(any<InputStream>()) } returns decoder
-        every { BitmapRegionDecoder.newInstance(any<InputStream>(), any()) } returns decoder
     }
 
     @Test
@@ -155,14 +147,55 @@ class ImageSourcesTest {
     }
 
     @Test
+    fun fromUri_whenUriIsBackedByFile_opensDecoderFromDescriptor() {
+        stubDecoder()
+        val expected = stubDescriptorDecoder()
+        val resolver = mockk<ContentResolver>()
+        val uri = Uri.parse("content://test/image")
+        val descriptor = mockk<ParcelFileDescriptor>(relaxed = true)
+        every { resolver.openFileDescriptor(uri, "r") } returns descriptor
+        every { resolver.openInputStream(uri) } answers { ByteArrayInputStream(ByteArray(8)) }
+
+        ImageSources.fromUri(resolver, uri).use {
+            assertEquals(30, it.storedWidth)
+            assertEquals(40, it.storedHeight)
+        }
+
+        verify { descriptor.close() }
+        verify { expected.recycle() }
+    }
+
+    @Test
     fun fromUri_withSupportedImage_createsSource() {
         stubDecoder()
         val resolver = mockk<ContentResolver>()
         val uri = Uri.parse("content://test/image")
+        every { resolver.openFileDescriptor(uri, "r") } throws FileNotFoundException("no file")
         every { resolver.openInputStream(uri) } answers { ByteArrayInputStream(ByteArray(8)) }
 
         ImageSources.fromUri(resolver, uri).use {
             assertEquals(10, it.storedWidth)
         }
+    }
+
+    private fun drawableId(name: String): Int =
+        context.resources.getIdentifier(name, "drawable", context.packageName)
+
+    private fun stubDescriptorDecoder(): BitmapRegionDecoder {
+        val decoder = mockk<BitmapRegionDecoder>(relaxed = true)
+        every { decoder.width } returns 30
+        every { decoder.height } returns 40
+        every { BitmapRegionDecoder.newInstance(any<ParcelFileDescriptor>()) } returns decoder
+        every { BitmapRegionDecoder.newInstance(any<FileDescriptor>(), any()) } returns decoder
+        return decoder
+    }
+
+    private fun stubDecoder() {
+        val decoder = mockk<BitmapRegionDecoder>(relaxed = true)
+        every { decoder.width } returns 10
+        every { decoder.height } returns 20
+        mockkStatic(BitmapRegionDecoder::class)
+        every { BitmapRegionDecoder.newInstance(any<InputStream>()) } returns decoder
+        every { BitmapRegionDecoder.newInstance(any<InputStream>(), any()) } returns decoder
     }
 }

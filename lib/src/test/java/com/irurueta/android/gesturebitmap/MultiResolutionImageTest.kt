@@ -40,63 +40,6 @@ import java.util.concurrent.TimeUnit
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class MultiResolutionImageTest {
 
-    private class Decode(val region: Rect, val sample: Int, val config: Bitmap.Config, val reuse: Bitmap?)
-
-    private class FakeSource(
-        override val storedWidth: Int = IMAGE_W,
-        override val storedHeight: Int = IMAGE_H
-    ) : ImageSource {
-        override val orientation = ImageOrientation.NORMAL
-        val decodes = mutableListOf<Decode>()
-        val results = mutableListOf<Bitmap>()
-        val threads = mutableListOf<Thread>()
-        var contentChangedCalls = 0
-        var contentChangedError: Exception? = null
-        var closed = false
-        var returnNull = false
-        var color = Color.BLUE
-
-        override fun decodeRegion(region: Rect, sampleSize: Int, config: Bitmap.Config, reuse: Bitmap?): Bitmap? {
-            decodes.add(Decode(Rect(region), sampleSize, config, reuse))
-            threads.add(Thread.currentThread())
-            if (returnNull) {
-                return null
-            }
-            val w = (region.width() + sampleSize - 1) / sampleSize
-            val h = (region.height() + sampleSize - 1) / sampleSize
-            val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-            bitmap.eraseColor(color)
-            results.add(bitmap)
-            return bitmap
-        }
-
-        override fun contentChanged() {
-            contentChangedCalls++
-            contentChangedError?.let { throw it }
-        }
-
-        override fun close() {
-            closed = true
-        }
-    }
-
-    private class ManualExecutor : Executor {
-        private val queue = ArrayDeque<Runnable>()
-
-        val pending: Int
-            get() = queue.size
-
-        override fun execute(command: Runnable) {
-            queue.addLast(command)
-        }
-
-        fun runAll() {
-            while (queue.isNotEmpty()) {
-                queue.removeFirst().run()
-            }
-        }
-    }
-
     private val direct = Executor { it.run() }
 
     private lateinit var source: FakeSource
@@ -113,32 +56,6 @@ class MultiResolutionImageTest {
         detailLoaded = 0
         failures.clear()
     }
-
-    private fun create(executor: Executor? = direct) = MultiResolutionImage(
-        source,
-        executor,
-        post = { it.run() },
-        onChanged = { changed++ },
-        onPreviewLoaded = { previewLoaded++ },
-        onDetailLoaded = { detailLoaded++ },
-        onFailed = { failures.add(it) }
-    )
-
-    private fun MultiResolutionImage.configure(
-        budget: Long = FULL_BUDGET,
-        hardware: Boolean = false,
-        regionDecoding: Boolean = true,
-        viewW: Int = VIEW_W,
-        viewH: Int = VIEW_H
-    ) = configure(viewW, viewH, budget, MAX_BITMAP, MAX_BITMAP, hardware, regionDecoding)
-
-    private fun MultiResolutionImage.show(
-        inverse: Matrix = Matrix(),
-        scale: Float = 1.0f,
-        scaling: Boolean = false
-    ) = update(inverse, scale, VIEW_W, VIEW_H, scaling)
-
-    private fun scaled(factor: Float) = Matrix().apply { setScale(factor, factor) }
 
     @Test
     fun configure_decodesPreviewThenLevelsInOrder() {
@@ -317,7 +234,7 @@ class MultiResolutionImageTest {
     }
 
     @Test
-    fun results_ofOlderGeneration_areRecycledAndDropped() {
+    fun configure_whenCalledAgainBeforeDecoding_recyclesAndDropsOlderResults() {
         val executor = ManualExecutor()
         val image = create(executor)
         image.configure(budget = 0L)
@@ -357,7 +274,7 @@ class MultiResolutionImageTest {
     }
 
     @Test
-    fun trimLevels_dropsLevelsAndPatch_thenDecodesAgainOnDemand() {
+    fun trimLevels_dropsLevelsAndPatchAndDecodesAgainOnDemand() {
         val image = create()
         image.configure()
         image.show()
@@ -637,6 +554,170 @@ class MultiResolutionImageTest {
 
         assertTrue(source.closed)
         assertTrue(bitmaps.all { it.isRecycled })
+    }
+
+    @Test
+    fun close_withDecodeInFlight_closesSourceOnExecutorAfterIt() {
+        val executor = ManualExecutor()
+        val image = create(executor)
+        image.configure()
+
+        image.close()
+
+        // the calling thread does not close the source while a decode may be running
+        assertFalse(source.closed)
+
+        executor.runAll()
+
+        assertTrue(source.closed)
+    }
+
+    @Test
+    fun configure_withoutRegionDecodingAfterPatch_releasesPatch() {
+        val image = create()
+        image.configure(budget = LIMITED_BUDGET)
+        image.show()
+        val patch = image.patchBitmap
+        assertNotNull(patch)
+
+        image.configure(budget = LIMITED_BUDGET, regionDecoding = false)
+
+        assertNull(image.patchBitmap)
+        assertTrue(patch?.isRecycled == true)
+        assertEquals(1, image.levelSample)
+    }
+
+    @Test
+    fun configure_withPendingRefreshes_stillRefreshesKeptLevels() {
+        val executor = ManualExecutor()
+        val image = create(executor)
+        image.configure(hardware = true)
+        executor.runAll()
+        source.decodes.clear()
+
+        // content changes and, before levels are decoded again, the view is resized
+        image.invalidate(null)
+        image.configure(hardware = true, viewW = VIEW_W / 2, viewH = VIEW_H / 2)
+        executor.runAll()
+
+        val kept = image.levelSample
+        assertTrue(source.decodes.any { it.sample == kept })
+    }
+
+    @Test
+    fun update_whenDecodedPatchIsNoLongerUseful_keepsReusedSpareBitmap() {
+        val executor = ManualExecutor()
+        val image = create(executor)
+        image.configure(budget = LIMITED_BUDGET)
+        executor.runAll()
+        image.show()
+        executor.runAll()
+        image.invalidate(null)
+        executor.runAll()
+        // a spare bitmap now exists; the next patch is decoded into it
+        source.reuseGiven = true
+        image.invalidate(null)
+        // run the invalidation, which queues the patch, then pan away so it is no longer useful
+        executor.runNext()
+        image.show(Matrix().apply { setTranslate(IMAGE_W / 2.0f, IMAGE_H / 2.0f) })
+        executor.runAll()
+
+        // the spare bitmap survives the discarded patch and is lent again to the next one
+        val lent = source.decodes.mapNotNull { it.reuse }
+        assertEquals(2, lent.size)
+        assertSame(lent[0], lent[1])
+        assertFalse(lent[0].isRecycled)
+    }
+
+    private fun create(executor: Executor? = direct) = MultiResolutionImage(
+        source,
+        executor,
+        post = { it.run() },
+        onChanged = { changed++ },
+        onPreviewLoaded = { previewLoaded++ },
+        onDetailLoaded = { detailLoaded++ },
+        onFailed = { failures.add(it) }
+    )
+
+    private fun MultiResolutionImage.configure(
+        budget: Long = FULL_BUDGET,
+        hardware: Boolean = false,
+        regionDecoding: Boolean = true,
+        viewW: Int = VIEW_W,
+        viewH: Int = VIEW_H
+    ) = configure(viewW, viewH, budget, MAX_BITMAP, MAX_BITMAP, hardware, regionDecoding)
+
+    private fun MultiResolutionImage.show(
+        inverse: Matrix = Matrix(),
+        scale: Float = 1.0f,
+        scaling: Boolean = false
+    ) = update(inverse, scale, VIEW_W, VIEW_H, scaling)
+
+    private fun scaled(factor: Float) = Matrix().apply { setScale(factor, factor) }
+
+    private class Decode(val region: Rect, val sample: Int, val config: Bitmap.Config, val reuse: Bitmap?)
+
+    private class FakeSource(
+        override val storedWidth: Int = IMAGE_W,
+        override val storedHeight: Int = IMAGE_H
+    ) : ImageSource {
+        override val orientation = ImageOrientation.NORMAL
+        val decodes = mutableListOf<Decode>()
+        val results = mutableListOf<Bitmap>()
+        val threads = mutableListOf<Thread>()
+        var contentChangedCalls = 0
+        var contentChangedError: Exception? = null
+        var closed = false
+        var returnNull = false
+        var reuseGiven = false
+        var color = Color.BLUE
+
+        override fun decodeRegion(region: Rect, sampleSize: Int, config: Bitmap.Config, reuse: Bitmap?): Bitmap? {
+            decodes.add(Decode(Rect(region), sampleSize, config, reuse))
+            threads.add(Thread.currentThread())
+            if (returnNull) {
+                return null
+            }
+            if (reuseGiven && reuse != null) {
+                return reuse
+            }
+            val w = (region.width() + sampleSize - 1) / sampleSize
+            val h = (region.height() + sampleSize - 1) / sampleSize
+            val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            bitmap.eraseColor(color)
+            results.add(bitmap)
+            return bitmap
+        }
+
+        override fun contentChanged() {
+            contentChangedCalls++
+            contentChangedError?.let { throw it }
+        }
+
+        override fun close() {
+            closed = true
+        }
+    }
+
+    private class ManualExecutor : Executor {
+        private val queue = ArrayDeque<Runnable>()
+
+        val pending: Int
+            get() = queue.size
+
+        override fun execute(command: Runnable) {
+            queue.addLast(command)
+        }
+
+        fun runNext() {
+            queue.removeFirst().run()
+        }
+
+        fun runAll() {
+            while (queue.isNotEmpty()) {
+                queue.removeFirst().run()
+            }
+        }
     }
 
     private companion object {

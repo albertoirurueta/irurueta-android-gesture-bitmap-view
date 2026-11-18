@@ -25,12 +25,6 @@ import java.util.concurrent.TimeUnit
  */
 class ImageLoadRecorder : GestureBitmapView.OnImageLoadListener {
 
-    private val lock = Object()
-
-    private var previews = 0
-    private var details = 0
-    private var failures = 0
-
     /**
      * Last failure reported, if any.
      */
@@ -55,6 +49,12 @@ class ImageLoadRecorder : GestureBitmapView.OnImageLoadListener {
      */
     val failureCount: Int
         get() = synchronized(lock) { failures }
+
+    private val lock = Object()
+
+    private var previews = 0
+    private var details = 0
+    private var failures = 0
 
     /**
      * Called when the preview has been decoded.

@@ -16,11 +16,11 @@
 
 package com.irurueta.android.gesturebitmap.test
 
+import org.junit.Assert.assertNotSame
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Rect
 import android.os.Build
-import android.util.Log
 import androidx.test.ext.junit.rules.activityScenarioRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -64,7 +64,7 @@ class RegionDecoderImageSourceTest {
     }
 
     @Test
-    fun create_readsStoredSizeAndOrientation() {
+    fun fromAsset_readsStoredSizeAndOrientation() {
         val normal = open(NORMAL_ASSET)
         assertEquals(WIDTH, normal.storedWidth)
         assertEquals(HEIGHT, normal.storedHeight)
@@ -131,7 +131,21 @@ class RegionDecoderImageSourceTest {
     }
 
     @Test
-    fun decodeRegion_withHardwareConfig_returnsBitmapAndLogsApiLevelSupport() {
+    fun decodeRegion_withReuseOfDifferentSize_returnsBitmapOfDecodedSize() {
+        val source = open(NORMAL_ASSET)
+        val reuse = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+
+        val result = source.decodeRegion(Rect(0, 0, 800, 600), 2, Bitmap.Config.ARGB_8888, reuse)
+
+        // a region decoder keeps the size of a reused bitmap, so one of another size is not reused
+        assertNotNull(result)
+        assertNotSame(reuse, result)
+        assertEquals(400, result!!.width)
+        assertEquals(300, result.height)
+    }
+
+    @Test
+    fun decodeRegion_withHardwareConfig_returnsHardwareBitmapWhereSupported() {
         val source = open(NORMAL_ASSET)
 
         val bitmap = source.decodeRegion(Rect(0, 0, 800, 600), 2, Bitmap.Config.HARDWARE, null)
@@ -140,14 +154,20 @@ class RegionDecoderImageSourceTest {
         bitmap!!
         assertEquals(400, bitmap.width)
         assertEquals(300, bitmap.height)
-        // BitmapRegionDecoder may ignore the HARDWARE config on some API levels. Both outcomes
-        // are valid and the result is logged to document the level where tests ran
-        val hardware = bitmap.config == Bitmap.Config.HARDWARE
-        Log.i(TAG, "HARDWARE region decoding worked=$hardware on API ${Build.VERSION.SDK_INT}")
+        if (Build.VERSION.SDK_INT >= VERIFIED_HARDWARE_API) {
+            // region decoding into hardware bitmaps has been verified from this API level on
+            assertEquals(Bitmap.Config.HARDWARE, bitmap.config)
+        } else {
+            // BitmapRegionDecoder may ignore the HARDWARE config on older API levels, in which
+            // case a software bitmap that can still be drawn must be returned
+            assertTrue(
+                bitmap.config == Bitmap.Config.HARDWARE || bitmap.config == Bitmap.Config.ARGB_8888
+            )
+        }
     }
 
     @Test
-    fun create_withUnsupportedFormat_throwsIOException() {
+    fun fromAsset_withUnsupportedFormat_throwsIOException() {
         try {
             open(TEXT_ASSET)
             fail("IOException expected")
@@ -157,7 +177,7 @@ class RegionDecoderImageSourceTest {
     }
 
     @Test
-    fun view_displaysEveryOrientationUpright() {
+    fun setImageSource_forEachExifOrientation_displaysImageUpright() {
         for ((asset, expected) in UPRIGHT_QUADRANTS) {
             val recorder = ImageLoadRecorder()
             var view: GestureBitmapView? = null
@@ -244,7 +264,10 @@ class RegionDecoderImageSourceTest {
     }
 
     private companion object {
-        private const val TAG = "RegionDecoderTest"
+        /**
+         * First API level where region decoding into hardware bitmaps has been verified.
+         */
+        const val VERIFIED_HARDWARE_API = 36
         private const val WIDTH = 2000
         private const val HEIGHT = 1500
         private const val TOLERANCE = 40

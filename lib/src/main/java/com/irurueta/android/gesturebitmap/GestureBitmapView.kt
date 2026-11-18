@@ -20,9 +20,7 @@ import android.animation.Animator
 import android.animation.FloatArrayEvaluator
 import android.animation.ValueAnimator
 import android.annotation.SuppressLint
-import android.content.ComponentCallbacks2
 import android.content.Context
-import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Matrix
@@ -34,8 +32,6 @@ import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.os.Parcelable
 import android.util.AttributeSet
 import android.view.GestureDetector
@@ -51,14 +47,11 @@ import java.io.File
 import java.io.IOException
 import java.util.concurrent.Executor
 import kotlin.math.abs
-import kotlin.math.ceil
 import kotlin.math.cos
-import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.sin
-import kotlin.math.sqrt
 
 /**
  * View used to display a bitmap allowing gestures to change view zooming, panning and rotation.
@@ -170,72 +163,22 @@ class GestureBitmapView @JvmOverloads constructor(
     private val destinationRect = RectF()
 
     /**
+     * Renderer of the image set through an [ImageSource]. It owns the source and its decoded
+     * resolution levels.
+     */
+    private val sourceImageRenderer = SourceImageRenderer(
+        onChanged = { invalidate() },
+        onPreviewLoaded = { imageLoadListener?.onPreviewLoaded(this) },
+        onDetailLoaded = { imageLoadListener?.onDetailLoaded(this) },
+        onFailed = { error -> imageLoadListener?.onImageLoadFailed(this, error) }
+    )
+
+    /**
      * Source of the image being displayed, or null when the image is a plain bitmap or there is
      * no image.
      */
-    private var source: ImageSource? = null
-
-    /**
-     * Holder of the decoded resolution levels of [source]. It is null when there is no source, or
-     * while the view is detached from its window.
-     */
-    private var multiResolutionImage: MultiResolutionImage? = null
-
-    /**
-     * Maximum width of a bitmap supported by the canvas, captured while drawing.
-     */
-    private var maxBitmapWidth = DEFAULT_MAX_BITMAP_SIZE
-
-    /**
-     * Maximum height of a bitmap supported by the canvas, captured while drawing.
-     */
-    private var maxBitmapHeight = DEFAULT_MAX_BITMAP_SIZE
-
-    /**
-     * Handler used to post results of background decoding to the UI thread.
-     */
-    private val mainHandler = Handler(Looper.getMainLooper())
-
-    /**
-     * Context where [componentCallbacks] is registered, or null when not registered.
-     */
-    private var callbacksContext: Context? = null
-
-    /**
-     * Callbacks to free memory when the system is low on it.
-     */
-    private val componentCallbacks = object : ComponentCallbacks2 {
-        override fun onTrimMemory(level: Int) {
-            multiResolutionImage?.trimLevels()
-        }
-
-        override fun onConfigurationChanged(newConfig: Configuration) {
-            // not used
-        }
-
-        @Deprecated("Deprecated in Java")
-        override fun onLowMemory() {
-            multiResolutionImage?.trimLevels()
-        }
-    }
-
-    /**
-     * Matrix mapping view coordinates into stored image coordinates. Reused to avoid
-     * allocations.
-     */
-    private val inverseStoredMatrix = Matrix()
-
-    /**
-     * Matrix mapping stored image coordinates into view coordinates. Reused to avoid
-     * allocations.
-     */
-    private val storedToViewMatrix = Matrix()
-
-    /**
-     * Matrix mapping upright image coordinates into stored image coordinates. Reused to avoid
-     * allocations.
-     */
-    private val inverseOrientationMatrix = Matrix()
+    private val source: ImageSource?
+        get() = sourceImageRenderer.source
 
     /**
      * Matrix mapping view coordinates into upright image coordinates. Reused to avoid
@@ -244,30 +187,19 @@ class GestureBitmapView @JvmOverloads constructor(
     private val inverseDisplayMatrix = Matrix()
 
     /**
-     * Array of matrix values. Reused to avoid allocations.
-     */
-    private val matrixValues = FloatArray(MATRIX_VALUES_LENGTH)
-
-    /**
      * Array containing a point. Reused to avoid allocations.
      */
     private val pointValues = FloatArray(2)
 
     /**
-     * Rectangle expressed in upright image pixels. Reused to avoid allocations.
-     */
-    private val uprightRect = RectF()
-
-    /**
-     * Rectangle expressed in stored image pixels. Reused to avoid allocations.
-     */
-    private val storedRect = Rect()
-
-    /**
      * Executor used to decode images from a source in background, or null to use a thread owned
      * by each image. Replaceable for testing purposes.
      */
-    internal var imageExecutor: Executor? = null
+    internal var imageExecutor: Executor?
+        get() = sourceImageRenderer.executor
+        set(value) {
+            sourceImageRenderer.executor = value
+        }
 
     /**
      * Indicates whether any gesture has changed the transformation since current touch
@@ -524,9 +456,8 @@ class GestureBitmapView @JvmOverloads constructor(
 
         _bitmap?.recycle()
         _bitmap = null
-        closeSource()
+        sourceImageRenderer.setSource(source)
 
-        this.source = source
         val storedWidth = source.storedWidth
         val storedHeight = source.storedHeight
         val orientation = source.orientation
@@ -534,8 +465,6 @@ class GestureBitmapView @JvmOverloads constructor(
         imageHeight = ImageOrientation.uprightHeight(orientation, storedWidth, storedHeight)
         ImageOrientation.toMatrix(orientation, storedWidth, storedHeight, orientationMatrix)
         destinationRect.set(0.0f, 0.0f, storedWidth.toFloat(), storedHeight.toFloat())
-
-        createMultiResolutionImage()
 
         if (resetMatrices) {
             if (imageWidth > 0 && imageHeight > 0) {
@@ -594,22 +523,7 @@ class GestureBitmapView @JvmOverloads constructor(
      * changed.
      */
     fun invalidateImage(region: Rect? = null) {
-        val image = multiResolutionImage
-        if (image != null) {
-            if (region == null) {
-                image.invalidate(null)
-            } else if (orientationMatrix.invert(inverseOrientationMatrix)) {
-                uprightRect.set(region)
-                inverseOrientationMatrix.mapRect(uprightRect)
-                storedRect.set(
-                    floor(uprightRect.left).toInt(),
-                    floor(uprightRect.top).toInt(),
-                    ceil(uprightRect.right).toInt(),
-                    ceil(uprightRect.bottom).toInt()
-                )
-                image.invalidate(storedRect)
-            }
-        } else if (_bitmap != null) {
+        if (!sourceImageRenderer.invalidate(region, orientationMatrix) && _bitmap != null) {
             invalidate()
         }
     }
@@ -641,7 +555,7 @@ class GestureBitmapView @JvmOverloads constructor(
      */
     fun setBitmap(bitmap: Bitmap?, resetMatrices: Boolean = true) {
         // a bitmap replaces any previous source
-        closeSource()
+        sourceImageRenderer.closeSource()
 
         // recycle previously existing bitmap
         _bitmap?.recycle()
@@ -903,6 +817,7 @@ class GestureBitmapView @JvmOverloads constructor(
         }
         set(value) {
             bitmapPaint.isAntiAlias = value
+            sourceImageRenderer.isAntiAlias = value
         }
 
     /**
@@ -1079,22 +994,24 @@ class GestureBitmapView @JvmOverloads constructor(
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
-        val image = multiResolutionImage
+        val hasLevels = sourceImageRenderer.image != null
         val bitmap = _bitmap
         val hasBitmap = bitmap != null && !bitmap.isRecycled
-        if (image == null && !hasBitmap) {
+        if (!hasLevels && !hasBitmap) {
             return
         }
 
-        captureMaxBitmapSize(canvas)
+        if (hasLevels && sourceImageRenderer.captureMaxBitmapSize(canvas)) {
+            configureImage()
+        }
 
         // matrices are used directly to avoid allocations while drawing
         canvas.withSave {
             concat(displayMatrix)
             withSave {
                 concat(orientationMatrix)
-                if (image != null) {
-                    drawLevels(this, image)
+                if (hasLevels) {
+                    sourceImageRenderer.draw(this, destinationRect)
                 } else if (bitmap != null) {
                     drawBitmap(bitmap, null, destinationRect, bitmapPaint)
                 }
@@ -1110,83 +1027,11 @@ class GestureBitmapView @JvmOverloads constructor(
     }
 
     /**
-     * Draws the current level and detail patch of the image.
-     * Canvas must be expressed in stored image pixels.
-     *
-     * @param canvas canvas where bitmaps are drawn.
-     * @param image image containing the bitmaps to draw.
-     */
-    private fun drawLevels(canvas: Canvas, image: MultiResolutionImage) {
-        val level = image.levelBitmap
-        val patch = image.patchBitmap
-        if (level != null && !level.isRecycled) {
-            if (patch != null && image.hasAlpha) {
-                // avoid blending translucent pixels of the level with those of the patch
-                canvas.withSave {
-                    clipOutRect(image.patchRegion)
-                    drawLevel(this, level, null)
-                }
-            } else {
-                drawLevel(canvas, level, null)
-            }
-        }
-        if (patch != null && !patch.isRecycled) {
-            drawLevel(canvas, patch, image.patchRegion)
-        }
-    }
-
-    /**
-     * Draws a bitmap, using a software copy of it when it is a hardware bitmap and the canvas is
-     * not hardware accelerated.
-     *
-     * @param canvas canvas where the bitmap is drawn.
-     * @param bitmap bitmap to draw.
-     * @param region region where the bitmap is drawn, or null to draw it over the whole stored
-     * image.
-     */
-    private fun drawLevel(canvas: Canvas, bitmap: Bitmap, region: Rect?) {
-        val needsCopy = !canvas.isHardwareAccelerated && bitmap.config == Bitmap.Config.HARDWARE
-        val toDraw = if (needsCopy) bitmap.copy(Bitmap.Config.ARGB_8888, false) else bitmap
-        if (toDraw == null) {
-            return
-        }
-        if (region != null) {
-            canvas.drawBitmap(toDraw, null, region, bitmapPaint)
-        } else {
-            canvas.drawBitmap(toDraw, null, destinationRect, bitmapPaint)
-        }
-        if (toDraw !== bitmap) {
-            toDraw.recycle()
-        }
-    }
-
-    /**
-     * Captures the maximum bitmap size supported by the canvas, reconfiguring the image when it
-     * changes.
-     *
-     * @param canvas canvas being drawn.
-     */
-    private fun captureMaxBitmapSize(canvas: Canvas) {
-        val w = canvas.maximumBitmapWidth
-        val h = canvas.maximumBitmapHeight
-        if (w > 0 && h > 0 && (w != maxBitmapWidth || h != maxBitmapHeight)) {
-            maxBitmapWidth = w
-            maxBitmapHeight = h
-            configureImage()
-        }
-    }
-
-    /**
      * Called when the view is attached to a window.
      */
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        if (callbacksContext == null) {
-            context.registerComponentCallbacks(componentCallbacks)
-            callbacksContext = context
-        }
-        if (source != null && multiResolutionImage == null) {
-            createMultiResolutionImage()
+        if (sourceImageRenderer.attach(context)) {
             updateImageLevels(false)
         }
         configureImage()
@@ -1194,14 +1039,26 @@ class GestureBitmapView @JvmOverloads constructor(
 
     /**
      * Called when the view is detached from its window. Memory used by decoded levels is
-     * released, and decoded again when the view is attached.
+     * released, and decoded again when the view is attached. The source stays open: set
+     * [imageSource] to null to close it when the view is no longer going to be used.
      */
     override fun onDetachedFromWindow() {
-        callbacksContext?.unregisterComponentCallbacks(componentCallbacks)
-        callbacksContext = null
-        multiResolutionImage?.release()
-        multiResolutionImage = null
+        sourceImageRenderer.detach()
         super.onDetachedFromWindow()
+    }
+
+    /**
+     * Called when the visibility of the view, taking its ancestors and window into account,
+     * changes. When it becomes visible the resolution needed by the displayed region is requested
+     * again, since detail is dropped when the system asks to free memory while in background.
+     *
+     * @param isVisible true if the view is visible, false otherwise.
+     */
+    override fun onVisibilityAggregated(isVisible: Boolean) {
+        super.onVisibilityAggregated(isVisible)
+        if (isVisible) {
+            updateImageLevels(false)
+        }
     }
 
     /**
@@ -1679,7 +1536,7 @@ class GestureBitmapView @JvmOverloads constructor(
      */
     private fun updateDisplayMatrix() {
         getDisplayMatrix(baseMatrix, paramsMatrix, displayMatrix)
-        if (multiResolutionImage != null) {
+        if (sourceImageRenderer.image != null) {
             updateImageLevels(
                 scaleGestureDetector?.isInProgress == true || scaleAnimator?.isRunning == true
             )
@@ -1693,47 +1550,14 @@ class GestureBitmapView @JvmOverloads constructor(
      * @param scaling true while the user is scaling.
      */
     private fun updateImageLevels(scaling: Boolean) {
-        val image = multiResolutionImage ?: return
-        if (width <= 0 || height <= 0) {
-            return
-        }
-
-        // stored pixels -> upright image pixels -> view coordinates
-        storedToViewMatrix.set(displayMatrix)
-        storedToViewMatrix.preConcat(orientationMatrix)
-        if (!storedToViewMatrix.invert(inverseStoredMatrix)) {
-            return
-        }
-        storedToViewMatrix.getValues(matrixValues)
-        val sx = matrixValues[Matrix.MSCALE_X]
-        val ky = matrixValues[Matrix.MSKEW_Y]
-        val displayScale = sqrt(sx * sx + ky * ky)
-        image.update(inverseStoredMatrix, displayScale, width, height, scaling)
+        sourceImageRenderer.update(displayMatrix, orientationMatrix, width, height, scaling)
     }
 
     /**
-     * Creates the multi resolution image of the current source, releasing any previous one.
-     */
-    private fun createMultiResolutionImage() {
-        val currentSource = source ?: return
-        multiResolutionImage?.release()
-        multiResolutionImage = MultiResolutionImage(
-            currentSource,
-            imageExecutor,
-            post = { runnable -> mainHandler.post(runnable) },
-            onChanged = { invalidate() },
-            onPreviewLoaded = { imageLoadListener?.onPreviewLoaded(this) },
-            onDetailLoaded = { imageLoadListener?.onDetailLoaded(this) },
-            onFailed = { error -> imageLoadListener?.onImageLoadFailed(this, error) }
-        )
-    }
-
-    /**
-     * Configures the multi resolution image for current view size and settings.
+     * Configures the decoded levels of the image for current view size and settings.
      * Nothing is done when there is no source or the view has no size yet.
      */
     private fun configureImage() {
-        val image = multiResolutionImage ?: return
         val w = width
         val h = height
         if (w <= 0 || h <= 0) {
@@ -1744,30 +1568,13 @@ class GestureBitmapView @JvmOverloads constructor(
         } else {
             cachedLevelsMemoryBudget
         }
-        image.configure(
+        sourceImageRenderer.configure(
             w,
             h,
             budget,
-            maxBitmapWidth,
-            maxBitmapHeight,
             hardwareBitmapsEnabled && isHardwareAccelerated,
             regionDecodingEnabled
         )
-    }
-
-    /**
-     * Closes current source, if any, along with its multi resolution image.
-     */
-    private fun closeSource() {
-        val image = multiResolutionImage
-        val currentSource = source
-        multiResolutionImage = null
-        source = null
-        if (image != null) {
-            image.close()
-        } else {
-            currentSource?.close()
-        }
     }
 
     /**
@@ -2756,7 +2563,6 @@ class GestureBitmapView @JvmOverloads constructor(
 
     init {
         bitmapPaint.isAntiAlias = true
-        bitmapPaint.isFilterBitmap = true
 
         doubleTapDirection = 1
 
@@ -3026,11 +2832,6 @@ class GestureBitmapView @JvmOverloads constructor(
          * pixels of the view, 4 bytes each.
          */
         const val DEFAULT_CACHED_LEVELS_MEMORY_BUDGET = Long.MAX_VALUE
-
-        /**
-         * Maximum bitmap size assumed until the canvas reports its own while drawing.
-         */
-        private const val DEFAULT_MAX_BITMAP_SIZE = 4096
 
         /**
          * Number of bytes of each pixel used by the default memory budget.

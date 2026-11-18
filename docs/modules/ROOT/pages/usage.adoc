@@ -160,6 +160,16 @@ NOTE: A source passed to `setImageSource` (or the `imageSource` property) is own
 is replaced by another image or source, so do not close it nor use it afterwards. Setting the source that is already
 set does nothing.
 
+IMPORTANT: Detaching the view releases the decoded bitmaps but keeps the source open, so that the image comes back
+when the view is attached again. When the view is not going to be used any more (for instance in `onDestroy` or
+`onDestroyView`), set `imageSource = null` to close the source and release its decoder right away instead of waiting
+for garbage collection. Sources are closed on a background thread, after any decode in progress, so custom
+`ImageSource` implementations must not assume `close()` runs on the UI thread.
+
+NOTE: Creating a source reads the image header. `ImageSources.fromFile` and `ImageSources.fromUri` (for URIs backed by
+a file) read the file as needed while decoding; the other factories keep the encoded image in memory. For large images
+or slow providers, create the source on a background thread and call `setImageSource` on the UI thread.
+
 You can implement `ImageSource` to display an image that comes from anywhere (a network cache, a tiled file, a
 generator). `decodeRegion` is called on a worker thread and never concurrently with itself:
 

@@ -18,6 +18,7 @@ package com.irurueta.android.gesturebitmap
 
 import android.graphics.Matrix
 import android.graphics.Rect
+import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.max
@@ -43,6 +44,11 @@ internal object ResolutionPlanner {
      * Number of bytes used by each pixel of a bitmap (ARGB_8888).
      */
     const val BYTES_PER_PIXEL = 4
+
+    /**
+     * Number of values needed to store the four corners of the view.
+     */
+    const val CORNER_VALUES = 8
 
     /**
      * Result of choosing which cached level must be drawn.
@@ -157,13 +163,34 @@ internal object ResolutionPlanner {
      * @throws IllegalArgumentException if [availableSamples] is empty.
      */
     fun levelToDraw(availableSamples: List<Int>, requiredSample: Int): LevelChoice {
+        val choice = levelSampleToDraw(availableSamples, requiredSample)
+        return LevelChoice(abs(choice), choice < 0)
+    }
+
+    /**
+     * Chooses which of the available cached levels must be drawn, without allocating.
+     *
+     * @param availableSamples sample sizes of the available levels, in any order. Must not be
+     * empty.
+     * @param requiredSample sample size needed to display the image sharply.
+     * @return the coarsest available sample less than or equal to [requiredSample], or the finest
+     * available sample negated when none is fine enough, meaning that a patch is needed.
+     * @throws IllegalArgumentException if [availableSamples] is empty.
+     */
+    fun levelSampleToDraw(availableSamples: List<Int>, requiredSample: Int): Int {
         require(availableSamples.isNotEmpty()) { "at least one level is required" }
-        val fineEnough = availableSamples.filter { it <= requiredSample }
-        return if (fineEnough.isEmpty()) {
-            LevelChoice(availableSamples.min(), true)
-        } else {
-            LevelChoice(fineEnough.max(), false)
+        var coarsestFineEnough = 0
+        var finest = Int.MAX_VALUE
+        for (i in availableSamples.indices) {
+            val sample = availableSamples[i]
+            if (sample <= requiredSample && sample > coarsestFineEnough) {
+                coarsestFineEnough = sample
+            }
+            if (sample < finest) {
+                finest = sample
+            }
         }
+        return if (coarsestFineEnough > 0) coarsestFineEnough else -finest
     }
 
     /**
@@ -184,6 +211,8 @@ internal object ResolutionPlanner {
      * @param maxPixels maximum number of bitmap pixels of the patch. Must be positive.
      * @param result rectangle where the region is stored in stored image coordinates. It is
      * emptied when the image is not visible.
+     * @param points array of at least 8 values used as working storage, so that callers on a hot
+     * path can avoid allocations.
      * @return sample size actually used, which is at least [sample].
      * @throws IllegalArgumentException if [sample] or [maxPixels] are not positive.
      */
@@ -195,23 +224,27 @@ internal object ResolutionPlanner {
         storedH: Int,
         sample: Int,
         maxPixels: Long,
-        result: Rect
+        result: Rect,
+        points: FloatArray = FloatArray(CORNER_VALUES)
     ): Int {
         require(sample > 0) { "sample must be positive" }
         require(maxPixels > 0) { "maximum pixels must be positive" }
+        require(points.size >= CORNER_VALUES) { "points must hold four corners" }
 
-        val points = floatArrayOf(
-            0.0f, 0.0f,
-            viewW.toFloat(), 0.0f,
-            viewW.toFloat(), viewH.toFloat(),
-            0.0f, viewH.toFloat()
-        )
-        inverseMatrix.mapPoints(points)
+        points[0] = 0.0f
+        points[1] = 0.0f
+        points[2] = viewW.toFloat()
+        points[3] = 0.0f
+        points[4] = viewW.toFloat()
+        points[5] = viewH.toFloat()
+        points[6] = 0.0f
+        points[7] = viewH.toFloat()
+        inverseMatrix.mapPoints(points, 0, points, 0, CORNER_VALUES / 2)
         var minX = points[0]
         var maxX = points[0]
         var minY = points[1]
         var maxY = points[1]
-        for (i in 2 until points.size step 2) {
+        for (i in 2 until CORNER_VALUES step 2) {
             minX = min(minX, points[i])
             maxX = max(maxX, points[i])
             minY = min(minY, points[i + 1])
@@ -228,10 +261,8 @@ internal object ResolutionPlanner {
         }
 
         var used = sample
-        for (overscan in floatArrayOf(OVERSCAN, 0.0f)) {
-            if (compute(left, top, right, bottom, overscan, storedW, storedH, used, maxPixels, result)) {
-                return used
-            }
+        if (compute(left, top, right, bottom, OVERSCAN, storedW, storedH, used, maxPixels, result)) {
+            return used
         }
         while (!compute(left, top, right, bottom, 0.0f, storedW, storedH, used, maxPixels, result)) {
             used *= 2

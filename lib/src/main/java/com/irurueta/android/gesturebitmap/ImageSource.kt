@@ -74,4 +74,12 @@ interface ImageSource : Closeable {
      * nothing.
      */
     fun contentChanged() {}
+
+    /**
+     * Releases the resources held by this source.
+     *
+     * A view owning this source may call this method on a worker thread, after any decode in
+     * progress, so that the UI thread never waits for a decode to finish.
+     */
+    override fun close()
 }

@@ -33,12 +33,38 @@ import java.io.InputStream
  * image: once to read the EXIF orientation and once to open the region decoder, both on creation and on
  * every [contentChanged] call. Streams returned by [opener] are always closed by this class.
  *
+ * A region decoder created from a stream keeps a copy of the whole encoded image in memory. The
+ * factories in [ImageSources] avoid that copy for files and file backed URIs.
+ *
+ * Creating an instance reads the image header, so it should be done away from the UI thread when
+ * the image is large or comes from a slow provider.
+ *
  * @property opener provides a new stream positioned at the start of the encoded image on every call.
+ * @property decoderOpener opens the region decoder without going through a stream. When it is
+ * null, returns null or fails, the decoder is opened from the stream given by [opener].
  * @throws IOException if the image cannot be read or its format is not supported by
  * [BitmapRegionDecoder].
  */
-class RegionDecoderImageSource(private val opener: () -> InputStream) : ImageSource {
+class RegionDecoderImageSource internal constructor(
+    private val opener: () -> InputStream,
+    private val decoderOpener: (() -> BitmapRegionDecoder?)?
+) : ImageSource {
 
+    /**
+     * Creates a source reading the encoded image from a stream.
+     *
+     * @param opener provides a new stream positioned at the start of the encoded image on every
+     * call.
+     * @throws IOException if the image cannot be read or its format is not supported by
+     * [BitmapRegionDecoder].
+     */
+    constructor(opener: () -> InputStream) : this(opener, null)
+
+    /**
+     * Region decoder in use, or null once the source is closed. It is replaced on a worker thread
+     * and closed from another one.
+     */
+    @Volatile
     private var decoder: BitmapRegionDecoder?
 
     /**
@@ -68,7 +94,9 @@ class RegionDecoderImageSource(private val opener: () -> InputStream) : ImageSou
     /**
      * Decodes a region of the image.
      *
-     * `inBitmap` is only set when [reuse] is mutable and [config] is not `Bitmap.Config.HARDWARE`.
+     * `inBitmap` is only set when [reuse] is mutable, [config] is not `Bitmap.Config.HARDWARE`
+     * and [reuse] has exactly the size of the decoded region, because a region decoder keeps the
+     * size of the reused bitmap, clipping or padding the decoded pixels otherwise.
      *
      * @param region region to decode, expressed in stored pixels.
      * @param sampleSize subsampling factor, a power of two.
@@ -86,7 +114,7 @@ class RegionDecoderImageSource(private val opener: () -> InputStream) : ImageSou
         val options = BitmapFactory.Options().apply {
             inSampleSize = sampleSize
             inPreferredConfig = config
-            if (reuse != null && reuse.isMutable && config != Bitmap.Config.HARDWARE) {
+            if (reuse != null && config != Bitmap.Config.HARDWARE && isReusable(reuse, region, sampleSize)) {
                 inBitmap = reuse
             }
         }
@@ -109,9 +137,10 @@ class RegionDecoderImageSource(private val opener: () -> InputStream) : ImageSou
      * @throws IOException if the image cannot be read or its format is not supported.
      */
     override fun contentChanged() {
-        decoder?.recycle()
-        decoder = null
-        orientation = readOrientation()
+        val oldDecoder = decoder ?: return
+        // the new decoder is validated before the old one is dropped, so that a failure leaves
+        // this source usable with its previous contents
+        val newOrientation = readOrientation()
         val newDecoder = openDecoder()
         if (newDecoder.width != storedWidth || newDecoder.height != storedHeight) {
             val width = newDecoder.width
@@ -121,7 +150,9 @@ class RegionDecoderImageSource(private val opener: () -> InputStream) : ImageSou
                 "Image size changed from ${storedWidth}x$storedHeight to ${width}x$height"
             )
         }
+        orientation = newOrientation
         decoder = newDecoder
+        oldDecoder.recycle()
     }
 
     /**
@@ -150,8 +181,40 @@ class RegionDecoderImageSource(private val opener: () -> InputStream) : ImageSou
         }
     }
 
+    /**
+     * Checks whether a bitmap can be given to the region decoder to hold a decoded region.
+     *
+     * @param reuse candidate bitmap.
+     * @param region region to decode, expressed in stored pixels.
+     * @param sampleSize subsampling factor.
+     * @return true when the bitmap is mutable and has exactly the size of the decoded region.
+     */
+    private fun isReusable(reuse: Bitmap, region: Rect, sampleSize: Int): Boolean {
+        val sample = maxOf(sampleSize, 1)
+        // sizes are only predictable when the region is a multiple of the sample size
+        return reuse.isMutable && !reuse.isRecycled &&
+                region.width() % sample == 0 && region.height() % sample == 0 &&
+                reuse.width == region.width() / sample && reuse.height == region.height() / sample
+    }
+
     @Suppress("DEPRECATION")
     private fun openDecoder(): BitmapRegionDecoder {
+        val direct = decoderOpener
+        if (direct != null) {
+            // when the image cannot be opened directly it is read from the stream instead
+            val result = try {
+                direct()
+            } catch (_: IOException) {
+                null
+            } catch (_: IllegalArgumentException) {
+                null
+            } catch (_: SecurityException) {
+                null
+            }
+            if (result != null) {
+                return result
+            }
+        }
         return opener().use { stream ->
             val result = try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -160,11 +223,21 @@ class RegionDecoderImageSource(private val opener: () -> InputStream) : ImageSou
                     BitmapRegionDecoder.newInstance(stream, false)
                 }
             } catch (e: IOException) {
-                throw IOException("Image format is not supported for region decoding", e)
+                throw IOException(UNSUPPORTED_MESSAGE, e)
             } catch (e: IllegalArgumentException) {
-                throw IOException("Image format is not supported for region decoding", e)
+                throw IOException(UNSUPPORTED_MESSAGE, e)
             }
-            result ?: throw IOException("Image format is not supported for region decoding")
+            result ?: throw IOException(UNSUPPORTED_MESSAGE)
         }
+    }
+
+    /**
+     * Constants of [RegionDecoderImageSource].
+     */
+    private companion object {
+        /**
+         * Message of the failure reported when the image cannot be region decoded.
+         */
+        const val UNSUPPORTED_MESSAGE = "Image format is not supported for region decoding"
     }
 }
