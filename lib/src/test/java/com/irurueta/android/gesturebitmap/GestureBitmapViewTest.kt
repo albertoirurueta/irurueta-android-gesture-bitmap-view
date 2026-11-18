@@ -6020,46 +6020,6 @@ class GestureBitmapViewTest {
         assertEquals(angle.toDouble(), view.transformationParameters.rotationAngle, ABSOLUTE_ERROR)
     }
 
-    @Test
-    fun limitDelta_whenOutOfRangeAndNotSnapping_acceptsOnlyApproachingVariations() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val view = GestureBitmapView(context)
-
-        val method = GestureBitmapView::class.java.getDeclaredMethod(
-            "limitDelta",
-            Float::class.javaPrimitiveType,
-            Float::class.javaPrimitiveType,
-            Float::class.javaPrimitiveType,
-            Float::class.javaPrimitiveType,
-            Boolean::class.javaPrimitiveType,
-            Float::class.javaPrimitiveType,
-            Float::class.javaPrimitiveType
-        )
-        method.isAccessible = true
-
-        fun limit(current: Float, delta: Float, snap: Boolean): Float =
-            method.invoke(view, current, delta, 0.0f, 10.0f, snap, 0.0f, 10.0f) as Float
-
-        // in range: variation is limited to allowed range
-        assertEquals(2.0f, limit(5.0f, 2.0f, false), 0.0f)
-        assertEquals(5.0f, limit(5.0f, 20.0f, false), 0.0f)
-        assertEquals(-5.0f, limit(5.0f, -20.0f, false), 0.0f)
-
-        // above maximum
-        assertEquals(0.0f, limit(15.0f, 3.0f, false), 0.0f)
-        assertEquals(-3.0f, limit(15.0f, -3.0f, false), 0.0f)
-        assertEquals(-15.0f, limit(15.0f, -30.0f, false), 0.0f)
-
-        // below minimum
-        assertEquals(0.0f, limit(-5.0f, -3.0f, false), 0.0f)
-        assertEquals(3.0f, limit(-5.0f, 3.0f, false), 0.0f)
-        assertEquals(15.0f, limit(-5.0f, 30.0f, false), 0.0f)
-
-        // snapping always ends within range
-        assertEquals(-5.0f, limit(15.0f, 3.0f, true), 0.0f)
-        assertEquals(5.0f, limit(-5.0f, -3.0f, true), 0.0f)
-    }
-
     companion object {
         private const val MIN_ANGLE_DEGREES = -180.0
         private const val MAX_ANGLE_DEGREES = 180.0

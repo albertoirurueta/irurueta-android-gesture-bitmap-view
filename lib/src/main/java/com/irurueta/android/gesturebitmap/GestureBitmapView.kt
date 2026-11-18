@@ -42,7 +42,6 @@ import android.view.animation.DecelerateInterpolator
 import androidx.core.content.withStyledAttributes
 import androidx.core.graphics.drawable.toBitmap
 import androidx.core.graphics.withSave
-import androidx.core.os.BundleCompat
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.Executor
@@ -50,7 +49,6 @@ import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.pow
 import kotlin.math.sin
 
 /**
@@ -1067,48 +1065,9 @@ class GestureBitmapView @JvmOverloads constructor(
      * @return parcelable containing stored view state.
      */
     override fun onSaveInstanceState(): Parcelable {
-        val bundle = Bundle()
-        bundle.putParcelable(SUPER_STATE_KEY, super.onSaveInstanceState())
-
-        val baseMatrixValues = FloatArray(MATRIX_VALUES_LENGTH)
-        baseMatrix.getValues(baseMatrixValues)
-        bundle.putFloatArray(BASE_MATRIX_KEY, baseMatrixValues)
-
-        val paramsMatrixValues = FloatArray(MATRIX_VALUES_LENGTH)
-        paramsMatrix.getValues(paramsMatrixValues)
-        bundle.putFloatArray(PARAMS_MATRIX_KEY, paramsMatrixValues)
-
-        val dispMatrixValues = FloatArray(MATRIX_VALUES_LENGTH)
-        val displayMatrix = displayTransformationMatrix
-        displayMatrix.getValues(dispMatrixValues)
-        bundle.putFloatArray(DISPLAY_MATRIX_KEY, dispMatrixValues)
-
-        bundle.putBoolean(ROTATION_ENABLED_KEY, rotationEnabled)
-        bundle.putBoolean(SCALE_ENABLED_KEY, scaleEnabled)
-        bundle.putBoolean(SCROLL_ENABLED_KEY, scrollEnabled)
-        bundle.putBoolean(TWO_FINGER_SCROLL_ENABLED_KEY, twoFingerScrollEnabled)
-        bundle.putBoolean(EXCLUSIVE_TWO_FINGER_SCROLL_ENABLED_KEY, exclusiveTwoFingerScrollEnabled)
-        bundle.putBoolean(DOUBLE_TAP_ENABLED_KEY, doubleTapEnabled)
-
-        bundle.putSerializable(DISPLAY_TYPE_KEY, displayType)
-
-        bundle.putFloat(MIN_SCALE_KEY, minScale)
-        bundle.putFloat(MAX_SCALE_KEY, maxScale)
-        bundle.putFloat(SCALE_FACTOR_JUMP_KEY, scaleFactorJump)
-        bundle.putFloat(MIN_SCALE_MARGIN_KEY, minScaleMargin)
-        bundle.putFloat(MAX_SCALE_MARGIN_KEY, maxScaleMargin)
-        bundle.putFloat(LEFT_SCROLL_MARGIN_KEY, leftScrollMargin)
-        bundle.putFloat(TOP_SCROLL_MARGIN_KEY, topScrollMargin)
-        bundle.putFloat(RIGHT_SCROLL_MARGIN_KEY, rightScrollMargin)
-        bundle.putFloat(BOTTOM_SCROLL_MARGIN_KEY, bottomScrollMargin)
-        bundle.putBoolean(SCROLL_TENSION_ENABLED_KEY, scrollTensionEnabled)
-        bundle.putBoolean(ROTATION_FLING_ENABLED_KEY, rotationFlingEnabled)
-        bundle.putFloat(SCROLL_TENSION_KEY, scrollTension)
-        bundle.putBoolean(REGION_DECODING_ENABLED_KEY, regionDecodingEnabled)
-        bundle.putBoolean(HARDWARE_BITMAPS_ENABLED_KEY, hardwareBitmapsEnabled)
-        bundle.putLong(CACHED_LEVELS_MEMORY_BUDGET_KEY, cachedLevelsMemoryBudget)
-
-        return bundle
+        return GestureBitmapViewState.save(
+            this, super.onSaveInstanceState(), baseMatrix, paramsMatrix, displayMatrix
+        )
     }
 
     /**
@@ -1117,55 +1076,10 @@ class GestureBitmapView @JvmOverloads constructor(
      * @param state stored view state.
      */
     override fun onRestoreInstanceState(state: Parcelable?) {
-        val viewState = if (state is Bundle) {
-            BundleCompat.getParcelable(state, SUPER_STATE_KEY, Parcelable::class.java)
-        } else {
-            state
-        }
-        super.onRestoreInstanceState(viewState)
+        super.onRestoreInstanceState(GestureBitmapViewState.superState(state))
 
         if (state is Bundle) {
-            displayType = BundleCompat.getSerializable(
-                state, DISPLAY_TYPE_KEY,
-                DisplayType::class.java
-            )!!
-
-            val baseMatrixValues = state.getFloatArray(BASE_MATRIX_KEY)
-            baseMatrix.setValues(baseMatrixValues)
-
-            val paramsMatrixValues = state.getFloatArray(PARAMS_MATRIX_KEY)
-            paramsMatrix.setValues(paramsMatrixValues)
-
-            val displayMatrixValues = state.getFloatArray(DISPLAY_MATRIX_KEY)
-            displayMatrix.setValues(displayMatrixValues)
-
-            rotationEnabled = state.getBoolean(ROTATION_ENABLED_KEY)
-            scaleEnabled = state.getBoolean(SCALE_ENABLED_KEY)
-            scrollEnabled = state.getBoolean(SCROLL_ENABLED_KEY)
-            twoFingerScrollEnabled = state.getBoolean(TWO_FINGER_SCROLL_ENABLED_KEY)
-            exclusiveTwoFingerScrollEnabled = state.getBoolean(
-                EXCLUSIVE_TWO_FINGER_SCROLL_ENABLED_KEY
-            )
-            doubleTapEnabled = state.getBoolean(DOUBLE_TAP_ENABLED_KEY)
-
-            minScale = state.getFloat(MIN_SCALE_KEY)
-            maxScale = state.getFloat(MAX_SCALE_KEY)
-            scaleFactorJump = state.getFloat(SCALE_FACTOR_JUMP_KEY)
-            minScaleMargin = state.getFloat(MIN_SCALE_MARGIN_KEY)
-            maxScaleMargin = state.getFloat(MAX_SCALE_MARGIN_KEY)
-            leftScrollMargin = state.getFloat(LEFT_SCROLL_MARGIN_KEY)
-            topScrollMargin = state.getFloat(TOP_SCROLL_MARGIN_KEY)
-            rightScrollMargin = state.getFloat(RIGHT_SCROLL_MARGIN_KEY)
-            bottomScrollMargin = state.getFloat(BOTTOM_SCROLL_MARGIN_KEY)
-            scrollTensionEnabled = state.getBoolean(SCROLL_TENSION_ENABLED_KEY, true)
-            rotationFlingEnabled = state.getBoolean(ROTATION_FLING_ENABLED_KEY, true)
-            scrollTension = state.getFloat(SCROLL_TENSION_KEY, DEFAULT_SCROLL_TENSION)
-            regionDecodingEnabled = state.getBoolean(REGION_DECODING_ENABLED_KEY, true)
-            hardwareBitmapsEnabled = state.getBoolean(HARDWARE_BITMAPS_ENABLED_KEY, true)
-            cachedLevelsMemoryBudget = state.getLong(
-                CACHED_LEVELS_MEMORY_BUDGET_KEY,
-                DEFAULT_CACHED_LEVELS_MEMORY_BUDGET
-            )
+            GestureBitmapViewState.restore(this, state, baseMatrix, paramsMatrix, displayMatrix)
         }
 
         // request redraw
@@ -1348,8 +1262,8 @@ class GestureBitmapView @JvmOverloads constructor(
         val viewHeight = height.toFloat()
 
         // vertical limits
-        val minTop = minAllowedStart(rectHeight, viewHeight, bottomMargin)
-        val maxTop = maxAllowedStart(rectHeight, viewHeight, topMargin)
+        val minTop = ScrollLimits.minAllowedStart(rectHeight, viewHeight, bottomMargin)
+        val maxTop = ScrollLimits.maxAllowedStart(rectHeight, viewHeight, topMargin)
         val newTop = rectTop + dy
         if (rectTop < maxTop && newTop >= maxTop) {
             topBoundReachedListener?.onTopBoundReached(this)
@@ -1357,15 +1271,17 @@ class GestureBitmapView @JvmOverloads constructor(
         if (rectTop > minTop && newTop <= minTop) {
             bottomBoundReachedListener?.onBottomBoundReached(this)
         }
-        result.y = limitDelta(
+        result.y = ScrollLimits.limitDelta(
             rectTop, dy, minTop, maxTop, snap,
-            minAllowedStart(rectHeight, viewHeight, 0.0f),
-            maxAllowedStart(rectHeight, viewHeight, 0.0f)
+            ScrollLimits.minAllowedStart(rectHeight, viewHeight, 0.0f),
+            ScrollLimits.maxAllowedStart(rectHeight, viewHeight, 0.0f),
+            scrollTensionEnabled,
+            scrollTension
         )
 
         // horizontal limits
-        val minLeft = minAllowedStart(rectWidth, viewWidth, rightMargin)
-        val maxLeft = maxAllowedStart(rectWidth, viewWidth, leftMargin)
+        val minLeft = ScrollLimits.minAllowedStart(rectWidth, viewWidth, rightMargin)
+        val maxLeft = ScrollLimits.maxAllowedStart(rectWidth, viewWidth, leftMargin)
         val newLeft = rectLeft + dx
         if (rectLeft < maxLeft && newLeft >= maxLeft) {
             leftBoundReachedListener?.onLeftBoundReached(this)
@@ -1373,126 +1289,13 @@ class GestureBitmapView @JvmOverloads constructor(
         if (rectLeft > minLeft && newLeft <= minLeft) {
             rightBoundReachedListener?.onRightBoundReached(this)
         }
-        result.x = limitDelta(
+        result.x = ScrollLimits.limitDelta(
             rectLeft, dx, minLeft, maxLeft, snap,
-            minAllowedStart(rectWidth, viewWidth, 0.0f),
-            maxAllowedStart(rectWidth, viewWidth, 0.0f)
+            ScrollLimits.minAllowedStart(rectWidth, viewWidth, 0.0f),
+            ScrollLimits.maxAllowedStart(rectWidth, viewWidth, 0.0f),
+            scrollTensionEnabled,
+            scrollTension
         )
-    }
-
-    /**
-     * Computes minimum allowed start (left or top) coordinate of displayed bitmap on one axis.
-     *
-     * @param rectSize size of displayed bitmap on the axis.
-     * @param viewSize size of the view on the axis.
-     * @param endMargin scroll margin at the end (right or bottom) of the axis.
-     * @return minimum allowed start coordinate.
-     */
-    private fun minAllowedStart(rectSize: Float, viewSize: Float, endMargin: Float): Float {
-        return if (rectSize <= viewSize) {
-            // bitmap fits within the view, it must remain centered (up to margin)
-            (viewSize - rectSize) / 2.0f - endMargin
-        } else {
-            // bitmap end can not leave an empty space larger than margin
-            viewSize - endMargin - rectSize
-        }
-    }
-
-    /**
-     * Computes maximum allowed start (left or top) coordinate of displayed bitmap on one axis.
-     *
-     * @param rectSize size of displayed bitmap on the axis.
-     * @param viewSize size of the view on the axis.
-     * @param startMargin scroll margin at the start (left or top) of the axis.
-     * @return maximum allowed start coordinate.
-     */
-    private fun maxAllowedStart(rectSize: Float, viewSize: Float, startMargin: Float): Float {
-        return if (rectSize <= viewSize) {
-            // bitmap fits within the view, it must remain centered (up to margin)
-            (viewSize - rectSize) / 2.0f + startMargin
-        } else {
-            // bitmap start can not leave an empty space larger than margin
-            startMargin
-        }
-    }
-
-    /**
-     * Limits requested variation of a coordinate so that it remains within provided range.
-     *
-     * @param current current value of coordinate.
-     * @param delta requested variation.
-     * @param minValue minimum allowed value.
-     * @param maxValue maximum allowed value.
-     * @param snap true to always end within the allowed range. If false and current value is
-     * already out of range (e.g. because scale or rotation have changed), only variations
-     * approaching the allowed range are accepted, and never beyond requested amount.
-     * @param softMinValue minimum value allowed without scroll margin (tension starts below it).
-     * @param softMaxValue maximum value allowed without scroll margin (tension starts above it).
-     * @return allowed variation.
-     */
-    private fun limitDelta(
-        current: Float,
-        delta: Float,
-        minValue: Float,
-        maxValue: Float,
-        snap: Boolean,
-        softMinValue: Float,
-        softMaxValue: Float
-    ): Float {
-        val target = current + delta
-        return when {
-            snap -> max(minValue, min(target, maxValue)) - current
-
-            current in minValue..maxValue -> {
-                val allowed = tensionDelta(current, delta, softMinValue, softMaxValue, minValue, maxValue)
-                max(minValue, min(current + allowed, maxValue)) - current
-            }
-
-            current > maxValue -> if (delta < 0.0f) max(target, minValue) - current else 0.0f
-            else -> if (delta > 0.0f) min(target, maxValue) - current else 0.0f
-        }
-    }
-
-    /**
-     * Applies tension (resistance) to a requested variation when it moves the coordinate further
-     * beyond the un-margined bounds, so that the resistance grows with the overscroll (as
-     * configured by [scrollTension]) until it reaches the margin.
-     *
-     * @param current current value of coordinate, within the margin-expanded range.
-     * @param delta requested variation.
-     * @param softMinValue minimum value without margin.
-     * @param softMaxValue maximum value without margin.
-     * @param minValue minimum value including margin.
-     * @param maxValue maximum value including margin.
-     * @return variation after applying tension, or the requested one if tension does not apply.
-     */
-    private fun tensionDelta(
-        current: Float,
-        delta: Float,
-        softMinValue: Float,
-        softMaxValue: Float,
-        minValue: Float,
-        maxValue: Float
-    ): Float {
-        if (!scrollTensionEnabled) {
-            return delta
-        }
-
-        val overscroll: Float
-        val margin: Float
-        if (delta > 0.0f) {
-            overscroll = max(0.0f, current - softMaxValue)
-            margin = maxValue - softMaxValue
-        } else {
-            overscroll = max(0.0f, softMinValue - current)
-            margin = softMinValue - minValue
-        }
-        if (overscroll <= 0.0f || margin <= 0.0f) {
-            return delta
-        }
-
-        val resistance = (1.0f - overscroll / margin).coerceIn(0.0f, 1.0f).pow(scrollTension)
-        return delta * resistance
     }
 
     /**
@@ -1621,105 +1424,8 @@ class GestureBitmapView @JvmOverloads constructor(
         pivotY: Float,
         invalidate: Boolean
     ) {
-        /*
-
-        We have an initial parameters metric transformation matrix
-
-        M = [oldS * R       oldT]
-            [0                 1]
-
-        So that old point coordinates respect to base bitmap coordinates are:
-        [oldX] = M * [baseX]
-        [oldY]       [baseY]
-        [1   ]       [baseZ]
-
-        Where oldS is previous scale, R is current rotation, oldT = (oldTx, oldTy)^T are previous
-        translation coordinates, 0 is a 1x2 zero vector and 1 is a scalar
-
-        We move pivot position back to the origin by
-        pre-multiplying by:
-
-        [I      -p]
-        [0       1]
-
-        where p are the pivot coordinates (px, py) and I is the 2x2 identity
-
-        apply new scale
-
-        [s / oldS * I      0]
-        [0                 1]
-
-        // and reset back pivot position
-
-        [I      p]
-        [0      1]
-
-        Hence the expression of new homogeneous coordinates (newX, newY, 1) expressed in terms
-        of previous coordinates is (taking into account that each step involves a
-        pre-multiplication)
-
-        [newX] = [I     p][s / oldS * I     0][I    -p][oldX]
-        [newY]   [0     1][0                1][0     1][oldY]
-        [1   ]                                         [1   ]
-
-        // multiplying former 2 matrices
-
-        [newX] = [s / oldS * I     p][I    -p][oldX]
-        [newY]   [0                1][0     1][oldY]
-        [1   ]                                [1   ]
-
-        // and finally
-
-        [newX] = [s / oldS * I     -s / oldS * p + p][oldX]
-        [newY]   [0                                1][oldY]
-        [1   ]                                       [1   ]
-
-
-        Notice that the expression above has no effect on pivot point. In other words:
-        // oldX = px --> newX = px
-        // oldY = py --> newY = py
-
-        Because the expression above needs to be represented respect to base coordinates (when
-        bitmap is initialized with base matrix to fit properly)
-
-        Then:
-        [newX] = [s / oldS * I     -s / oldS * p + p][oldS * R       oldT][baseX]
-        [newY]   [0                                1][0                 1][baseY]
-        [1   ]                                                            [1    ]
-
-        [newX] = [s * R         s / oldS * oldT - s / oldS * p + p][baseX]
-        [newY]   [0                                              1][baseY]
-        [1   ]                                                     [1    ]
-
-
-        Hence the new parameters matrix is
-
-        newM = [s * R         s / oldS * oldT - s / oldS * p + p]
-               [0                                              1]
-
-        where rotation R is preserved, the new scale is s, and the only term that has changed is
-        translation t which is equal to:
-        t = s / oldS * (oldT - p) + p
-
-        NOTE: rotation R follows expression
-        R = [cos(theta)     -sin(theta)]
-            [sin(theta)      cos(theta)]
-
-        where theta is the rotation angle.
-        */
-
         getTransformationParameters(paramsMatrix, parameters)
-        val oldScale = parameters.scale
-        val oldHorizontalTranslation = parameters.horizontalTranslation
-        val oldVerticalTranslation = parameters.verticalTranslation
-
-        // set new parameters
-        val scaleDiff = scale / oldScale
-        val horizontalTranslation = scaleDiff * (oldHorizontalTranslation - pivotX) + pivotX
-        val verticalTranslation = scaleDiff * (oldVerticalTranslation - pivotY) + pivotY
-        parameters.scale = scale
-        parameters.horizontalTranslation = horizontalTranslation
-        parameters.verticalTranslation = verticalTranslation
+        MetricTransformationUpdater.scaleAt(parameters, scale, pivotX, pivotY)
 
         setTransformationParameters(parameters, paramsMatrix)
         // display matrix is always kept up to date, since scroll limits are computed from it
@@ -1741,143 +1447,8 @@ class GestureBitmapView @JvmOverloads constructor(
         pivotX: Float,
         pivotY: Float
     ) {
-        /*
-
-        We have an initial parameters metric transformation matrix
-
-        M = [s * oldR       t]
-            [0              1]
-
-        So that old point coordinates respect to base bitmap coordinates are:
-        [oldX] = M * [baseX]
-        [oldY]       [baseY]
-        [1   ]       [baseZ]
-
-        Where s scale, oldR is previous rotation, t = (tx, ty)^T are translation
-        coordinates, 0 is a 1x2 zero vector and 1 is a scalar
-
-        We move pivot position back to the origin by
-        pre-multiplying by:
-
-        [I      -p]
-        [0       1]
-
-        where p are the pivot coordinates (px, py) and I is the 2x2 identity
-
-        apply rotation change:
-        diffR = R*oldR^-1 = R*oldR^T
-
-        where oldR^-1 is the inverse of previous rotation, which is equivalent to its transpose.
-        diffR is equivalent to applying a rotation with the difference of rotation angles, as
-        follows:
-
-        diffTheta = theta - oldTheta
-
-        Hence,
-
-        [diffR      0]
-        [0          1]
-
-        // and then reset back pivot position
-
-        [I      p]
-        [0      1]
-
-        Hence the expression of new homogeneous coordinates (newX, newY, 1) expressed in terms
-        of previous coordinates is (taking into account that each step involves a
-        pre-multiplication)
-
-        [newX] = [I     p][diffR     0][I    -p][oldX]
-        [newY]   [0     1][0         1][0     1][oldY]
-        [1   ]                                  [1   ]
-
-        // multiplying former 2 matrices
-
-        [newX] = [diffR     p][I    -p][oldX]
-        [newY]   [0         1][0     1][oldY]
-        [1   ]                         [1   ]
-
-        // and finally
-
-        [newX] = [diffR     -diffR * p + p][oldX]
-        [newY]   [0                      1][oldY]
-        [1   ]                             [1   ]
-
-
-        Notice that the expression above has no effect on pivot point. In other words:
-        // oldX = px --> newX = px
-        // oldY = py --> newY = py
-
-        Because the expression above needs to be represented respect to base coordinates (when
-        bitmap is initialized with base matrix to fit properly)
-
-        Then:
-        [newX] = [diffR     -diffR * p + p][s * oldR       t][baseX]
-        [newY]   [0                      1][0              1][baseY]
-        [1   ]                                               [1    ]
-
-
-        [newX] = [s * diffR * oldR     diffR * (t - p) + p][baseX]
-        [newY]   [0                                      1][baseY]
-        [1   ]                                             [1    ]
-
-        taking into account that diffR = R*oldR^-1, then
-
-        [newX] = [s * R * oldR^-1 * oldR     diffR * (t - p) + p][baseX]
-        [newY]   [0                                            1][baseY]
-        [1   ]                                                   [1    ]
-
-        [newX] = [s * R     diffR * (t - p) + p][baseX]
-        [newY]   [0                           1][baseY]
-        [1   ]                                  [1    ]
-
-
-
-        Hence the new transformation matrix is
-
-        newM = [s * R     diffR * (t - p) + p]
-               [0                           1]
-
-        where new rotation R is set, scale s is preserved, and the only term that has changed is
-        translation t which depends on amount of rotation change diffR and pivot point p as follows:
-
-        t = diffR * (t - p) + p
-
-        NOTE: rotation R follows expression
-        R = [cos(theta)     -sin(theta)]
-            [sin(theta)      cos(theta)]
-
-        where theta is the new rotation angle.
-
-        and rotation change diffR follows expression:
-        R = [cos(theta - oldTheta)     -sin(theta - oldTheta)]
-            [sin(theta - oldTheta)      cos(theta - oldTheta)]
-
-        which depends on the amount of rotation change
-
-        Hence, the new translation t is:
-        newT = [newTx] = [cos(theta - oldTheta)     -sin(theta - oldTheta)][tx - px] + px
-               [newTy]   [sin(theta - oldTheta)      cos(theta - oldTheta)][ty - py] + py
-
-        newTx = cos(theta - oldTheta) * (tx - px) - sin(theta - oldTheta) * (ty - py) + px
-        newTy = sin(theta - oldTheta) * (tx - px) + cos(theta - oldTheta) * (ty - py) + py
-        */
-
         getTransformationParameters(paramsMatrix, parameters)
-        val oldRotationAngle = parameters.rotationAngle
-        val oldHorizontalTranslation = parameters.horizontalTranslation
-        val oldVerticalTranslation = parameters.verticalTranslation
-
-        // set new parameters
-        val diffTheta = rotationAngle - oldRotationAngle
-        val cosDiffTheta = cos(diffTheta)
-        val sinDiffTheta = sin(diffTheta)
-        val diffTx = oldHorizontalTranslation - pivotX
-        val diffTy = oldVerticalTranslation - pivotY
-
-        parameters.rotationAngle = rotationAngle.toDouble()
-        parameters.horizontalTranslation = cosDiffTheta * diffTx - sinDiffTheta * diffTy + pivotX
-        parameters.verticalTranslation = sinDiffTheta * diffTx + cosDiffTheta * diffTy + pivotY
+        MetricTransformationUpdater.rotateAt(parameters, rotationAngle, pivotX, pivotY)
 
         setTransformationParameters(parameters, paramsMatrix)
         updateDisplayMatrix()
@@ -2317,112 +1888,9 @@ class GestureBitmapView @JvmOverloads constructor(
         val viewHeight =
             if (this.height > 0) this.height.toFloat() else this.measuredHeight.toFloat()
 
-        val bitmapWidth = imageWidth.toFloat()
-        val bitmapHeight = imageHeight.toFloat()
-
-        val bitmapRect = RectF(0.0f, 0.0f, bitmapWidth, bitmapHeight)
-
-        when (displayType) {
-            DisplayType.NONE -> {
-                // returns identity matrix
-                result.reset()
-            }
-
-            DisplayType.FIT_IF_BIGGER -> {
-                if (bitmapWidth > viewWidth || bitmapHeight > viewHeight) {
-                    val scaleWidth = viewWidth / bitmapWidth
-                    val scaleHeight = viewHeight / bitmapHeight
-
-                    val scale = min(scaleWidth, scaleHeight)
-                    val newWidth = scale * bitmapWidth
-                    val newHeight = scale * bitmapHeight
-
-                    val halfWidthDiff = (viewWidth - newWidth) / 2.0f
-                    val halfHeightDiff = (viewHeight - newHeight) / 2.0f
-
-                    val dstRect = RectF(
-                        halfWidthDiff, halfHeightDiff,
-                        newWidth + halfWidthDiff, newHeight + halfHeightDiff
-                    )
-
-                    result.setRectToRect(bitmapRect, dstRect, Matrix.ScaleToFit.CENTER)
-                } else {
-                    // image fits within the view
-                    result.reset()
-                }
-            }
-
-            DisplayType.FIT_X_TOP -> {
-                val scale = viewWidth / bitmapWidth
-                val newHeight = scale * bitmapHeight
-                val dstRect = RectF(0.0f, 0.0f, viewWidth, newHeight)
-
-                result.setRectToRect(bitmapRect, dstRect, Matrix.ScaleToFit.CENTER)
-            }
-
-            DisplayType.FIT_X_BOTTOM -> {
-                val scale = viewWidth / bitmapWidth
-                val newHeight = scale * bitmapHeight
-                val heightDiff = viewHeight - newHeight
-                val dstRect = RectF(0.0f, heightDiff, viewWidth, newHeight + heightDiff)
-
-                result.setRectToRect(bitmapRect, dstRect, Matrix.ScaleToFit.CENTER)
-            }
-
-            DisplayType.FIT_X_CENTER -> {
-                val scale = viewWidth / bitmapWidth
-                val newHeight = scale * bitmapHeight
-                val halfHeightDiff = (viewHeight - newHeight) / 2.0f
-                val dstRect = RectF(0.0f, halfHeightDiff, viewWidth, newHeight + halfHeightDiff)
-
-                result.setRectToRect(bitmapRect, dstRect, Matrix.ScaleToFit.CENTER)
-            }
-
-            DisplayType.FIT_Y_LEFT -> {
-                val scale = viewHeight / bitmapHeight
-                val newWidth = scale * bitmapWidth
-                val dstRect = RectF(0.0f, 0.0f, newWidth, viewHeight)
-
-                result.setRectToRect(bitmapRect, dstRect, Matrix.ScaleToFit.CENTER)
-            }
-
-            DisplayType.FIT_Y_RIGHT -> {
-                val scale = viewHeight / bitmapHeight
-                val newWidth = scale * bitmapWidth
-                val widthDiff = (viewWidth - newWidth)
-                val dstRect = RectF(widthDiff, 0.0f, newWidth + widthDiff, viewHeight)
-
-                result.setRectToRect(bitmapRect, dstRect, Matrix.ScaleToFit.CENTER)
-            }
-
-            DisplayType.FIT_Y_CENTER -> {
-                val scale = viewHeight / bitmapHeight
-                val newWidth = scale * bitmapWidth
-                val halfWidthDiff = (viewWidth - newWidth) / 2.0f
-                val dstRect = RectF(halfWidthDiff, 0.0f, newWidth + halfWidthDiff, viewHeight)
-
-                result.setRectToRect(bitmapRect, dstRect, Matrix.ScaleToFit.CENTER)
-            }
-
-            DisplayType.CENTER_CROP -> {
-                val scaleWidth = viewWidth / bitmapWidth
-                val scaleHeight = viewHeight / bitmapHeight
-
-                val scale = max(scaleWidth, scaleHeight)
-                val newWidth = scale * bitmapWidth
-                val newHeight = scale * bitmapHeight
-
-                val halfWidthDiff = (viewWidth - newWidth) / 2.0f
-                val halfHeightDiff = (viewHeight - newHeight) / 2.0f
-
-                val dstRect = RectF(
-                    halfWidthDiff, halfHeightDiff,
-                    newWidth + halfWidthDiff, newHeight + halfHeightDiff
-                )
-
-                result.setRectToRect(bitmapRect, dstRect, Matrix.ScaleToFit.CENTER)
-            }
-        }
+        BaseMatrixCalculator.compute(
+            imageWidth, imageHeight, viewWidth, viewHeight, displayType, result
+        )
     }
 
     /**
@@ -2870,138 +2338,6 @@ class GestureBitmapView @JvmOverloads constructor(
          * finishes.
          */
         private const val MIN_SCROLL_CORRECTION = 0.5f
-
-        /**
-         * Key to store state of parent class.
-         */
-        private const val SUPER_STATE_KEY = "superState"
-
-        /**
-         * Key to store base matrix.
-         */
-        private const val BASE_MATRIX_KEY = "baseMatrix"
-
-        /**
-         * Key to store params matrix.
-         */
-        private const val PARAMS_MATRIX_KEY = "paramsMatrix"
-
-        /**
-         * Key to store display matrix.
-         */
-        private const val DISPLAY_MATRIX_KEY = "displayMatrix"
-
-        /**
-         * Key to store flag indicating whether rotation gesture is enabled.
-         */
-        private const val ROTATION_ENABLED_KEY = "rotationEnabled"
-
-        /**
-         * Key to store flag indicating whether scaling gesture is enabled.
-         */
-        private const val SCALE_ENABLED_KEY = "scaleEnabled"
-
-        /**
-         * Key to store flag indicating whether scroll gesture is enabled.
-         */
-        private const val SCROLL_ENABLED_KEY = "scrollEnabled"
-
-        /**
-         * Key to store flag indicating whether scroll gesture is allowed with two fingers
-         * only.
-         */
-        private const val TWO_FINGER_SCROLL_ENABLED_KEY = "twoFingerScrollEnabled"
-
-        /**
-         * Key to store flag indicating whether two finger scroll is exclusively enabled.
-         */
-        private const val EXCLUSIVE_TWO_FINGER_SCROLL_ENABLED_KEY =
-            "exclusiveTwoFingerScrollEnabled"
-
-        /**
-         * Key to store flag indicating whether tap gesture is enabled.
-         */
-        private const val DOUBLE_TAP_ENABLED_KEY = "doubleTapEnabled"
-
-        /**
-         * Key to store display type.
-         */
-        private const val DISPLAY_TYPE_KEY = "displayType"
-
-        /**
-         * Key to store minimum allowed scale.
-         */
-        private const val MIN_SCALE_KEY = "minScale"
-
-        /**
-         * Key to store maximum allowed scale.
-         */
-        private const val MAX_SCALE_KEY = "maxScale"
-
-        /**
-         * Key to store scale factor jump.
-         */
-        private const val SCALE_FACTOR_JUMP_KEY = "scaleFactorJump"
-
-        /**
-         * Key to store minimum scale margin.
-         */
-        private const val MIN_SCALE_MARGIN_KEY = "minScaleMargin"
-
-        /**
-         * Key to store maximum scale margin.
-         */
-        private const val MAX_SCALE_MARGIN_KEY = "maxScaleMargin"
-
-        /**
-         * Key to store left scroll margin.
-         */
-        private const val LEFT_SCROLL_MARGIN_KEY = "leftScrollMargin"
-
-        /**
-         * Key to store top scroll margin.
-         */
-        private const val TOP_SCROLL_MARGIN_KEY = "topScrollMargin"
-
-        /**
-         * Key to store right scroll margin.
-         */
-        private const val RIGHT_SCROLL_MARGIN_KEY = "rightScrollMargin"
-
-        /**
-         * Key to store bottom scroll margin.
-         */
-        private const val BOTTOM_SCROLL_MARGIN_KEY = "bottomScrollMargin"
-
-        /**
-         * Key to store whether scroll tension is enabled.
-         */
-        private const val SCROLL_TENSION_ENABLED_KEY = "scrollTensionEnabled"
-
-        /**
-         * Key to store whether rotation fling is enabled.
-         */
-        private const val ROTATION_FLING_ENABLED_KEY = "rotationFlingEnabled"
-
-        /**
-         * Key to store amount of scroll tension.
-         */
-        private const val SCROLL_TENSION_KEY = "scrollTension"
-
-        /**
-         * Key to store whether region decoding is enabled.
-         */
-        private const val REGION_DECODING_ENABLED_KEY = "regionDecodingEnabled"
-
-        /**
-         * Key to store whether hardware bitmaps are enabled.
-         */
-        private const val HARDWARE_BITMAPS_ENABLED_KEY = "hardwareBitmapsEnabled"
-
-        /**
-         * Key to store the memory budget of cached levels.
-         */
-        private const val CACHED_LEVELS_MEMORY_BUDGET_KEY = "cachedLevelsMemoryBudget"
 
         /**
          * Length of arrays to store matrix values.

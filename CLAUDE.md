@@ -35,9 +35,12 @@ Examples: `constructor_withAttributeSet_initializesWithDifferentParameters`,
 Keep files small and focused on one responsibility.
 
 - Do not grow a large file further. When a change adds a new concern to a class, put that
-  concern in its own class and file, and have the existing class delegate to it. For example the
-  drawing of images set through an `ImageSource` lives in `SourceImageRenderer`, not in
-  `GestureBitmapView`.
+  concern in its own class and file, and have the existing class delegate to it. For example
+  `GestureBitmapView` delegates to `SourceImageRenderer` (images set through an `ImageSource`),
+  `ScrollLimits`, `MetricTransformationUpdater`, `BaseMatrixCalculator` and
+  `GestureBitmapViewState`.
+- Computations that need no view state go in stateless `internal object`s, which are tested
+  directly instead of through private members of the view.
 - Prefer extracting and reusing functionality over adding private members to an existing class.
   Smaller classes are easier to read, review and test on their own.
 - As a guide, plan a split when a new source file would pass about 500 lines, and do not add
