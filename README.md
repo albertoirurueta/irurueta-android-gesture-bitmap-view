@@ -27,7 +27,7 @@ rotation on the bitmap.
 | --- | --- |
 | Language | Kotlin 2.3.10 (JVM target 17) |
 | Build tool | Gradle 9.4.0 (Kotlin DSL) |
-| Latest release | `1.2.7` |
+| Latest release | `1.3.0` |
 | Platform | Android |
 | Min / compile SDK | `minSdk` 26 (Android 8.0) / `compileSdk` 36 |
 | Kotlin / AGP | Kotlin 2.3.10 / Android Gradle Plugin 9.0.1 |
@@ -60,7 +60,7 @@ Latest release:
 
 ```kotlin
 dependencies {
-    implementation("com.irurueta:irurueta-android-gesture-bitmap-view:1.2.7")
+    implementation("com.irurueta:irurueta-android-gesture-bitmap-view:1.3.0")
 }
 ```
 
