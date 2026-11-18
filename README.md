@@ -93,9 +93,30 @@ view.bitmap = bitmap
 
 Note that setting a new bitmap recycles the bitmap previously held by the view.
 
+### Large images
+
+Large photos do not need to be decoded by hand. `app:src` on a raster resource (JPEG, PNG or WebP) is decoded by
+regions at the resolution required by the current zoom, applying the EXIF orientation, and the same can be done from
+code with a resource, a file or a content URI:
+
+```kotlin
+view.setImageResource(R.drawable.image)
+view.setImageFile(file)
+view.setImageUri(uri)
+```
+
+See the Usage ("Large images") and "Updating image contents" pages of the
+[documentation site](https://albertoirurueta.github.io/irurueta-android-gesture-bitmap-view) for the memory budget,
+custom image sources, load listeners, updating the contents of a displayed image and a complete draw mode.
+
 The following properties are supported in xml layouts:
 
-- **src**: drawable to be displayed
+- **src**: drawable to be displayed. A raster resource is decoded by regions (EXIF orientation applied)
+- **regionDecodingEnabled**: whether images are decoded by regions at several resolutions. Enabled by default.
+- **hardwareBitmapsEnabled**: whether decoded images are hardware bitmaps (when the view is hardware accelerated).
+  Enabled by default.
+- **cachedLevelsMemoryBudget**: bytes for the decoded resolution levels. By default, 4 times the pixels of the view,
+  4 bytes each; 0 keeps only the preview.
 - **displayType**: enum to indicate the way the bitmap is initially displayed. The following options
   are supported:
     - **none**: bitmap is displayed at original scale, without additional rotation or translation.

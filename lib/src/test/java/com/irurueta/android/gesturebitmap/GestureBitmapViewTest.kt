@@ -22,6 +22,7 @@ import android.content.res.TypedArray
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Matrix
+import android.graphics.RectF
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.os.Bundle
@@ -171,6 +172,18 @@ class GestureBitmapViewTest {
         every { drawable.toBitmap(any(), any(), any()) }.returns(bitmap)
 
         every { typedArray.getDrawable(R.styleable.GestureBitmapView_src) }.returns(drawable)
+        every { typedArray.getResourceId(R.styleable.GestureBitmapView_src, any()) }.returns(0)
+        every {
+            typedArray.getBoolean(R.styleable.GestureBitmapView_regionDecodingEnabled, any())
+        }.returns(false)
+        every {
+            typedArray.getBoolean(R.styleable.GestureBitmapView_hardwareBitmapsEnabled, any())
+        }.returns(false)
+        every { typedArray.hasValue(R.styleable.GestureBitmapView_cachedLevelsMemoryBudget) }
+            .returns(true)
+        every {
+            typedArray.getInt(R.styleable.GestureBitmapView_cachedLevelsMemoryBudget, any())
+        }.returns(12345)
         every { typedArray.getInt(R.styleable.GestureBitmapView_displayType, any()) }.returns(
             GestureBitmapView.DisplayType.NONE.ordinal
         )
@@ -314,6 +327,9 @@ class GestureBitmapViewTest {
         assertEquals(150.0f, view.topScrollMargin, 0.0f)
         assertEquals(175.0f, view.rightScrollMargin, 0.0f)
         assertEquals(200.0f, view.bottomScrollMargin, 0.0f)
+        assertFalse(view.regionDecodingEnabled)
+        assertFalse(view.hardwareBitmapsEnabled)
+        assertEquals(12345L, view.cachedLevelsMemoryBudget)
         assertFalse(view.scrollTensionEnabled)
         assertEquals(2.5f, view.scrollTension, 0.0f)
         assertFalse(view.rotationFlingEnabled)
@@ -1621,6 +1637,191 @@ class GestureBitmapViewTest {
     }
 
     @Test
+    fun displayRect_whenNoBitmap_returnsNull() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val view = GestureBitmapView(context)
+
+        assertNull(view.displayRect)
+    }
+
+    @Test
+    fun displayRect_forEachDisplayType_matchesBaseMatrixAppliedToBitmapSize() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+
+        for (type in GestureBitmapView.DisplayType.values()) {
+            val view = GestureBitmapView(context)
+            view.displayType = type
+            view.measure(
+                View.MeasureSpec.makeMeasureSpec(1080, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY)
+            )
+
+            every { bitmap.isRecycled }.returns(false)
+            every { bitmap.width }.returns(640)
+            every { bitmap.height }.returns(480)
+
+            view.bitmap = bitmap
+
+            val expected = RectF(0.0f, 0.0f, 640.0f, 480.0f)
+            view.baseTransformationMatrix.mapRect(expected)
+
+            val displayRect = view.displayRect
+            assertNotNull(displayRect)
+            assertEquals(expected, displayRect)
+            assertEquals(Matrix(), view.transformationMatrix)
+            assertEquals(view.baseTransformationMatrix, view.displayTransformationMatrix)
+        }
+    }
+
+    @Test
+    fun displayRect_whenDisplayTypeNone_isBitmapSize() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val view = GestureBitmapView(context)
+        view.displayType = GestureBitmapView.DisplayType.NONE
+        view.measure(
+            View.MeasureSpec.makeMeasureSpec(1080, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY)
+        )
+
+        every { bitmap.isRecycled }.returns(false)
+        every { bitmap.width }.returns(640)
+        every { bitmap.height }.returns(480)
+
+        view.bitmap = bitmap
+
+        assertEquals(Matrix(), view.baseTransformationMatrix)
+        assertEquals(RectF(0.0f, 0.0f, 640.0f, 480.0f), view.displayRect)
+    }
+
+    @Test
+    fun displayRect_whenDisplayTypeFitXCenter_fillsViewWidthAndIsCentered() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val view = GestureBitmapView(context)
+        view.measure(
+            View.MeasureSpec.makeMeasureSpec(1080, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY)
+        )
+
+        every { bitmap.isRecycled }.returns(false)
+        every { bitmap.width }.returns(640)
+        every { bitmap.height }.returns(480)
+
+        view.bitmap = bitmap
+
+        val rect = view.displayRect
+        assertNotNull(rect)
+        assertEquals(0.0f, rect!!.left, 1e-3f)
+        assertEquals(1080.0f, rect.right, 1e-3f)
+        assertEquals(555.0f, rect.top, 1e-3f)
+        assertEquals(1365.0f, rect.bottom, 1e-3f)
+    }
+
+    @Test
+    fun setBitmap_whenMatricesAreNotResetAndSizeDiffers_keepsMatricesAndUsesNewSizeForDisplayRect() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val view = GestureBitmapView(context)
+        view.measure(
+            View.MeasureSpec.makeMeasureSpec(1080, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY)
+        )
+
+        val bitmap1 = mockk<Bitmap>()
+        justRun { bitmap1.setHasMipMap(any()) }
+        justRun { bitmap1.recycle() }
+        every { bitmap1.isRecycled }.returns(false)
+        every { bitmap1.width }.returns(640)
+        every { bitmap1.height }.returns(480)
+
+        view.bitmap = bitmap1
+
+        val paramsMatrix = Matrix(view.transformationMatrix)
+        val baseMatrix = Matrix(view.baseTransformationMatrix)
+        val displayMatrix = Matrix(view.displayTransformationMatrix)
+
+        val bitmap2 = mockk<Bitmap>()
+        justRun { bitmap2.setHasMipMap(any()) }
+        every { bitmap2.isRecycled }.returns(false)
+        every { bitmap2.width }.returns(200)
+        every { bitmap2.height }.returns(100)
+
+        view.setBitmap(bitmap2, false)
+
+        assertEquals(paramsMatrix, view.transformationMatrix)
+        assertEquals(baseMatrix, view.baseTransformationMatrix)
+        assertEquals(displayMatrix, view.displayTransformationMatrix)
+
+        val expected = RectF(0.0f, 0.0f, 200.0f, 100.0f)
+        displayMatrix.mapRect(expected)
+        assertEquals(expected, view.displayRect)
+    }
+
+    @Test
+    fun onRestoreInstanceState_whenStateSavedBeforeImageSizeWasTracked_restoresMatrices() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val view = GestureBitmapView(context)
+
+        // bundle containing only the keys that existed before image size decoupling
+        val bundle = Bundle()
+        bundle.putParcelable(SUPER_STATE_KEY, null)
+
+        val baseMatrix = getTransformationParameters().toMatrix()
+        val baseValues = FloatArray(MetricTransformationParameters.MATRIX_VALUES_LENGTH)
+        baseMatrix.getValues(baseValues)
+        bundle.putFloatArray(BASE_MATRIX_KEY, baseValues)
+
+        val paramsMatrix = getTransformationParameters().toMatrix()
+        val paramsValues = FloatArray(MetricTransformationParameters.MATRIX_VALUES_LENGTH)
+        paramsMatrix.getValues(paramsValues)
+        bundle.putFloatArray(PARAMS_MATRIX_KEY, paramsValues)
+
+        val displayMatrix = getTransformationParameters().toMatrix()
+        val displayValues = FloatArray(MetricTransformationParameters.MATRIX_VALUES_LENGTH)
+        displayMatrix.getValues(displayValues)
+        bundle.putFloatArray(DISPLAY_MATRIX_KEY, displayValues)
+
+        bundle.putBoolean(ROTATION_ENABLED_KEY, true)
+        bundle.putBoolean(SCALE_ENABLED_KEY, true)
+        bundle.putBoolean(SCROLL_ENABLED_KEY, true)
+        bundle.putBoolean(TWO_FINGER_SCROLL_ENABLED_KEY, true)
+        bundle.putBoolean(EXCLUSIVE_TWO_FINGER_SCROLL_ENABLED_KEY, false)
+        bundle.putBoolean(DOUBLE_TAP_ENABLED_KEY, true)
+        bundle.putSerializable(DISPLAY_TYPE_KEY, GestureBitmapView.DisplayType.FIT_X_CENTER)
+        bundle.putFloat(MIN_SCALE_KEY, 1.0f)
+        bundle.putFloat(MAX_SCALE_KEY, 10.0f)
+        bundle.putFloat(SCALE_FACTOR_JUMP_KEY, 3.0f)
+        bundle.putFloat(MIN_SCALE_MARGIN_KEY, 0.1f)
+        bundle.putFloat(MAX_SCALE_MARGIN_KEY, 1.0f)
+        bundle.putFloat(LEFT_SCROLL_MARGIN_KEY, 100.0f)
+        bundle.putFloat(TOP_SCROLL_MARGIN_KEY, 100.0f)
+        bundle.putFloat(RIGHT_SCROLL_MARGIN_KEY, 100.0f)
+        bundle.putFloat(BOTTOM_SCROLL_MARGIN_KEY, 100.0f)
+        bundle.putBoolean(SCROLL_TENSION_ENABLED_KEY, true)
+        bundle.putFloat(SCROLL_TENSION_KEY, 1.0f)
+
+        view.callPrivateFunc("onRestoreInstanceState", bundle)
+
+        assertEquals(baseMatrix, view.baseTransformationMatrix)
+        assertEquals(paramsMatrix, view.transformationMatrix)
+        assertEquals(displayMatrix, view.displayTransformationMatrix)
+
+        // no image yet, so there is no display rect
+        assertNull(view.displayRect)
+
+        // setting a bitmap without resetting matrices keeps the restored state
+        every { bitmap.isRecycled }.returns(false)
+        every { bitmap.width }.returns(640)
+        every { bitmap.height }.returns(480)
+        view.setBitmap(bitmap, false)
+
+        assertEquals(baseMatrix, view.baseTransformationMatrix)
+        assertEquals(paramsMatrix, view.transformationMatrix)
+        assertEquals(displayMatrix, view.displayTransformationMatrix)
+        val expected = RectF(0.0f, 0.0f, 640.0f, 480.0f)
+        displayMatrix.mapRect(expected)
+        assertEquals(expected, view.displayRect)
+    }
+
+    @Test
     fun setDrawable_setsExpectedBitmap() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val view = GestureBitmapView(context)
@@ -2677,8 +2878,7 @@ class GestureBitmapViewTest {
         val canvas = mockk<Canvas>()
         view.callPrivateFunc("onDraw", canvas)
 
-        verify(exactly = 1) { view.bitmap }
-        confirmVerified(view)
+        verify { canvas wasNot Called }
     }
 
     @Test
@@ -2716,11 +2916,13 @@ class GestureBitmapViewTest {
         assertSame(bitmap, view.bitmap)
         verify(exactly = 2) { bitmap.isRecycled }
 
-        val canvas = mockk<Canvas>(relaxUnitFun = true)
+        val canvas = mockk<Canvas>(relaxed = true)
         view.callPrivateFunc("onDraw", canvas)
 
         verify(exactly = 3) { bitmap.isRecycled }
-        verify(exactly = 1) { canvas.drawBitmap(bitmap, any(), any()) }
+        verify(exactly = 2) { canvas.save() }
+        verify(exactly = 1) { canvas.drawBitmap(bitmap, null, any<RectF>(), any()) }
+        verify(exactly = 2) { canvas.restoreToCount(any()) }
     }
 
     @Test
@@ -2998,7 +3200,7 @@ class GestureBitmapViewTest {
 
         view.callPrivateFunc("onSizeChanged", 1080, 1920, 0, 0)
 
-        verify(exactly = 1) { view.bitmap }
+        verify(exactly = 0) { view.bitmap }
         verify(exactly = 0) { view.invalidate() }
     }
 
@@ -5816,46 +6018,6 @@ class GestureBitmapViewTest {
 
         // check new rotation angle
         assertEquals(angle.toDouble(), view.transformationParameters.rotationAngle, ABSOLUTE_ERROR)
-    }
-
-    @Test
-    fun limitDelta_whenOutOfRangeAndNotSnapping_acceptsOnlyApproachingVariations() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val view = GestureBitmapView(context)
-
-        val method = GestureBitmapView::class.java.getDeclaredMethod(
-            "limitDelta",
-            Float::class.javaPrimitiveType,
-            Float::class.javaPrimitiveType,
-            Float::class.javaPrimitiveType,
-            Float::class.javaPrimitiveType,
-            Boolean::class.javaPrimitiveType,
-            Float::class.javaPrimitiveType,
-            Float::class.javaPrimitiveType
-        )
-        method.isAccessible = true
-
-        fun limit(current: Float, delta: Float, snap: Boolean): Float =
-            method.invoke(view, current, delta, 0.0f, 10.0f, snap, 0.0f, 10.0f) as Float
-
-        // in range: variation is limited to allowed range
-        assertEquals(2.0f, limit(5.0f, 2.0f, false), 0.0f)
-        assertEquals(5.0f, limit(5.0f, 20.0f, false), 0.0f)
-        assertEquals(-5.0f, limit(5.0f, -20.0f, false), 0.0f)
-
-        // above maximum
-        assertEquals(0.0f, limit(15.0f, 3.0f, false), 0.0f)
-        assertEquals(-3.0f, limit(15.0f, -3.0f, false), 0.0f)
-        assertEquals(-15.0f, limit(15.0f, -30.0f, false), 0.0f)
-
-        // below minimum
-        assertEquals(0.0f, limit(-5.0f, -3.0f, false), 0.0f)
-        assertEquals(3.0f, limit(-5.0f, 3.0f, false), 0.0f)
-        assertEquals(15.0f, limit(-5.0f, 30.0f, false), 0.0f)
-
-        // snapping always ends within range
-        assertEquals(-5.0f, limit(15.0f, 3.0f, true), 0.0f)
-        assertEquals(5.0f, limit(-5.0f, -3.0f, true), 0.0f)
     }
 
     companion object {

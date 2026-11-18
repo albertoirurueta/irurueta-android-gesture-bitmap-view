@@ -1,0 +1,75 @@
+= Updating image contents
+
+NOTE: This documentation was generated with the assistance of AI. Please report any inaccuracies.
+
+An image that is already displayed can change: the user draws on it, a filter is applied, or a file is rewritten. This
+page shows how to tell the view so that it draws the new contents. Positions in the examples are expressed in upright
+image pixels (EXIF orientation already applied), the same ones used by `mapViewToImage` and by the overlay drawer.
+
+== Choosing the way
+
+[cols="2,2,2,3",options="header"]
+|===
+|Way |Memory |Cost of an update |When to use
+
+|Mutable `Bitmap` set with `view.bitmap`
+|The whole bitmap, uncompressed, in memory.
+|`invalidateImage()` only redraws the view.
+|Small and medium images that are edited frequently.
+
+|`BitmapImageSource` set with `setImageSource`
+|The whole bitmap in memory, plus the decoded levels within `cachedLevelsMemoryBudget`.
+|`invalidateImage(region)` decodes again only the levels and patch that intersect the region.
+|Large bitmaps drawn on by the caller, which stay smooth when zooming.
+
+|File or other `ImageSource`
+|Only the preview, cached levels and patch.
+|`invalidateImage()` calls `contentChanged()` on the source and decodes again.
+|The image lives in a file that another component rewrites, or a custom source whose contents change.
+|===
+
+`invalidateImage(region)` takes the changed `Rect` in upright image pixels, or `null` for the whole image. Without an
+image it does nothing.
+
+== A mutable bitmap
+
+[source,kotlin]
+----
+include::example$mutableBitmap.kt[]
+----
+
+== A BitmapImageSource
+
+The bitmap stays owned by the caller: the view never recycles it, not even when the source is closed. Reads are
+synchronized on the bitmap, so synchronize on it too while drawing.
+
+[source,kotlin]
+----
+include::example$bitmapImageSource.kt[]
+----
+
+== A rewritten file
+
+[source,kotlin]
+----
+include::example$rewrittenFile.kt[]
+----
+
+The file must keep the dimensions of the image. To show an image of another size, set it again.
+
+== Complete draw mode
+
+The view does not provide a drawing mode, but it provides the pieces to build one:
+
+* `scrollEnabled`, `scaleEnabled`, `rotationEnabled` and `doubleTapEnabled` set to `false`, so gestures do not compete
+  with drawing.
+* An `OnTouchListener` that converts the touches with `mapViewToImage(x, y, result)`. It returns `false` when there is
+  no image or the display matrix cannot be inverted.
+* An `ImageOverlayDrawer` that draws the stroke in progress as a `Path`. Its canvas is expressed in upright image
+  pixels and clipped to the image, so the stroke is drawn with the same coordinates it was recorded in.
+* When the stroke ends, it is drawn on the bitmap and `invalidateImage(region)` refreshes only the region it touched.
+
+[source,kotlin]
+----
+include::example$drawMode.kt[]
+----

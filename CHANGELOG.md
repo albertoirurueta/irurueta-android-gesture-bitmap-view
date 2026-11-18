@@ -9,6 +9,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Multi-resolution display of large images: images set through an `ImageSource` are decoded by regions, showing a
+  preview first, cached levels within a memory budget and a full-resolution patch of the visible area, instead of
+  holding the whole bitmap in memory. New API: `ImageSource`, `ImageSources` (`fromResource`, `fromAsset`, `fromFile`,
+  `fromUri`, `fromBytes`), `RegionDecoderImageSource`, `BitmapImageSource`; and in `GestureBitmapView`: `imageSource`,
+  `setImageSource`, `setImageResource`, `setImageUri`, `setImageFile`, `regionDecodingEnabled`,
+  `hardwareBitmapsEnabled`, `cachedLevelsMemoryBudget`, `imageLoadListener` (`OnImageLoadListener`),
+  `invalidateImage(region)`, `imageOverlayDrawer` (`ImageOverlayDrawer`), `mapViewToImage` and the XML attributes
+  `regionDecodingEnabled`, `hardwareBitmapsEnabled` and `cachedLevelsMemoryBudget`. EXIF orientation is applied.
 - Rotation fling: when a rotation gesture ends while still rotating, the bitmap keeps rotating, decelerating until it
   stops. The fling starts when the last finger is lifted (within 150 ms of the rotation ending); configurable with
   `rotationFlingEnabled` / `app:rotationFlingEnabled` (default `true`).
@@ -20,6 +28,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- `app:src` on a raster resource (JPEG, PNG, WebP) is decoded by regions: the EXIF orientation is applied and the
+  image size is the size in pixels of the file, which is only visible with `DisplayType.NONE` and
+  `DisplayType.FIT_IF_BIGGER`. Set `regionDecodingEnabled` to `false` for the previous behaviour. `bitmap` returns
+  `null` while an image source is set.
 - Redraws caused by gestures and animations are requested with `invalidate()` instead of `postInvalidate()`, so that
   they are drawn without an additional frame of delay, and `onDraw` no longer allocates. Public setters keep using
   `postInvalidate()` and can still be called from any thread.
