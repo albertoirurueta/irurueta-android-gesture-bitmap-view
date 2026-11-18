@@ -1,0 +1,27 @@
+= What's new
+
+NOTE: This documentation was generated with the assistance of AI. Please report any inaccuracies.
+
+== 1.3.0
+
+* ✨ Multi-resolution display of large images through the new `ImageSource` API (`ImageSources.fromResource`,
+  `fromAsset`, `fromFile`, `fromUri`, `fromBytes`): a preview, cached levels within a memory budget and a
+  full-resolution patch of the visible area are decoded in the background, with EXIF orientation applied. See
+  xref:usage.adoc[Usage] and xref:editing.adoc[Updating image contents].
+* ✨ New `GestureBitmapView` members: `setImageResource`, `setImageUri`, `setImageFile`, `invalidateImage(region)`,
+  `mapViewToImage`, `imageOverlayDrawer`, `imageLoadListener`, `regionDecodingEnabled`, `hardwareBitmapsEnabled` and
+  `cachedLevelsMemoryBudget`.
+* ✨ Rotation fling: the bitmap keeps rotating and decelerates when a rotation gesture ends while still rotating
+  (`rotationFlingEnabled`).
+* ✨ Adjustable overscroll tension when dragging past a scroll limit (`scrollTensionEnabled`, `scrollTension`).
+* ♻️ `app:src` on a raster resource is decoded by regions, and bitmap drawables are no longer scaled up by screen
+  density. Set `regionDecodingEnabled` to `false` for the previous behaviour.
+* ♻️ Smoother gestures and animations: redraws use `invalidate()`, fling starts at the finger's velocity, scale
+  animations decelerate, and returning to minimum scale keeps the rotation.
+* ♻️ Updated dependencies: `irurueta-geometry` 1.6.1 and `irurueta-android-test-utils` 1.3.3. Builds run on JDK 21;
+  the library still targets JVM 17.
+* 🐛 Fixed sudden movements during gestures, bitmaps not returning within scroll limits, rotation jumps with lifted or
+  extra fingers, and slow frames with large density-scaled drawables.
+
+See the https://github.com/albertoirurueta/irurueta-android-gesture-bitmap-view/blob/main/CHANGELOG.md[changelog]
+for the full list of changes.

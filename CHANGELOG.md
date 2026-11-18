@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-18
+
 ### Added
 
 - Multi-resolution display of large images: images set through an `ImageSource` are decoded by regions, showing a
@@ -170,7 +172,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   `InvalidMatrixException` for non-metric matrices.
 - `RotationGestureDetector` for two-finger rotation gestures.
 
-[Unreleased]: https://github.com/albertoirurueta/irurueta-android-gesture-bitmap-view/compare/1.2.7...HEAD
+[Unreleased]: https://github.com/albertoirurueta/irurueta-android-gesture-bitmap-view/compare/1.3.0...HEAD
+[1.3.0]: https://github.com/albertoirurueta/irurueta-android-gesture-bitmap-view/compare/1.2.7...1.3.0
 [1.2.7]: https://github.com/albertoirurueta/irurueta-android-gesture-bitmap-view/compare/1.2.6...1.2.7
 [1.2.6]: https://github.com/albertoirurueta/irurueta-android-gesture-bitmap-view/compare/1.2.5...1.2.6
 [1.2.5]: https://github.com/albertoirurueta/irurueta-android-gesture-bitmap-view/compare/1.2.4...1.2.5
